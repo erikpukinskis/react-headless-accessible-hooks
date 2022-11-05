@@ -10,7 +10,7 @@
     "strict": true,
     "skipLibCheck": true,
     "downlevelIteration": true,
-    "jsx": "react"
+    "jsx": "react-jsx"
   },
   "include": ["lib", "docs"]
 }
