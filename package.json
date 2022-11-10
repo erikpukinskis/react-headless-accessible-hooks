@@ -66,5 +66,8 @@
     "test": "vitest run --config vite.test.config.js --reporter verbose",
     "watch:problems": "tsc --watch --noEmit -p tsconfig.json",
     "watch:test": "vitest watch --config vite.test.config.js"
+  },
+  "dependencies": {
+    "short-uuid": "^4.2.2"
   }
 }
