@@ -38,3 +38,5 @@ Maybes:
 - [ ] Try: Blur placeholder
 - [ ] Fix: flicker when dragging slowly into last position
 - [ ] Fix: cursor flashing when dragging on border
+- [ ] Move out `handleUp` into its own function
+- [ ] Rename `list` to `service`
