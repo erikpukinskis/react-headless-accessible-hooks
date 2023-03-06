@@ -42,7 +42,7 @@ const Card = styled("div", {
 
 export const Basic = (
   <Demo
-    generate={() => {
+    render={() => {
       const USERS = [
         {
           id: "1",

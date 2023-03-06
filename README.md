@@ -36,7 +36,7 @@ Finish useOrderableList + cleanup:
 - [x] Hand doesn't let go on drop
 - [x] Fix: cursor flashing when dragging on border
 - [ ] Fix flashing when dragging quickly between slots
-- [ ] Re-implement drag model separate from the DOM stuff
+- [ ] =====> Re-implement drag model separate from the DOM stuff
 - [ ] Fix double dragging
 - [ ] Move out `handleUp` into its own function
 - [ ] Rename `list` to `service`
