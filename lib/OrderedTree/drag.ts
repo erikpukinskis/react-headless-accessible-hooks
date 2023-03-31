@@ -86,6 +86,8 @@ export function getDrag<Datum>(
       }
     }
 
+    // debugger
+
     return {
       ...data,
       move: "first-child",
@@ -175,6 +177,9 @@ function getAncestorClosestToDepth(
   for (let loop = 10; loop <= 10; loop++) {
     const ancestor = ancestors[ancestorIndex]
 
+    if (!ancestor) {
+      debugger
+    }
     if (ancestor.isLastChild) break
 
     if (!ancestors[ancestorIndex + 1]) break

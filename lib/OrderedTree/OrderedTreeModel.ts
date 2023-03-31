@@ -10,6 +10,7 @@ type DragStart<Datum> = {
   element: HTMLElement
   clientX: number
   clientY: number
+  treeBox: TreeBox
   originalOrder: number
   mouseMoveHandler(this: void, event: MouseEvent): void
   mouseUpHandler(this: void): void
@@ -186,17 +187,16 @@ export class OrderedTreeModel<Datum> {
    * Updates CSS positioning styles on the element being dragged
    */
   updateDragElementPosition() {
-    if (!this.treeBox) return undefined
     if (!this.dragStart) return undefined
 
     const dx = this.clientX - this.dragStart.clientX
     const dy = this.clientY - this.dragStart.clientY
-    const rowHeight = this.treeBox.height / this.treeSize
+    const rowHeight = this.dragStart.treeBox.height / this.treeSize
     const rowTop =
-      this.treeBox.offsetTop + this.dragStart.node.index * rowHeight
+      this.dragStart.treeBox.offsetTop + this.dragStart.node.index * rowHeight
 
-    const left = `${this.treeBox.offsetLeft + dx}px`
-    const top = `${rowTop + dy}px`
+    const left = `${(this.dragStart.treeBox.offsetLeft + dx).toFixed(1)}px`
+    const top = `${(rowTop + dy).toFixed(1)}px`
 
     const { element } = this.dragStart
 
@@ -264,13 +264,13 @@ export class OrderedTreeModel<Datum> {
     // }
 
     if (!this.dragStart) return
-    if (!this.treeBox) return
 
     this.updateDragElementPosition()
 
-    const rowHeight = this.treeBox.height / this.treeSize
-    const y = this.clientY - this.treeBox.top
-    const hoverIndex = Math.floor(y / rowHeight)
+    const rowHeight = this.dragStart.treeBox.height / this.treeSize
+    const treeY = this.clientY - this.dragStart.treeBox.top
+    this.dump("treeY", treeY)
+    const hoverIndex = Math.floor(treeY / rowHeight)
     const dx = this.clientX - this.dragStart.clientX
     const dy = this.clientY - this.dragStart.clientY
 
@@ -369,6 +369,8 @@ export class OrderedTreeModel<Datum> {
   }
 
   handleMouseDown(node: OrderedTreeNode<Datum>, event: React.MouseEvent) {
+    if (!this.treeBox) return
+
     const mouseMoveHandler = this.handleMouseMove.bind(this)
     const mouseUpHandler = this.handleMouseUp.bind(this)
 
@@ -394,6 +396,7 @@ export class OrderedTreeModel<Datum> {
       element,
       clientX: this.clientX,
       clientY: this.clientY,
+      treeBox: this.treeBox,
       originalOrder: node.order,
       mouseMoveHandler,
       mouseUpHandler,

@@ -196,10 +196,6 @@ const TreeRows = ({ node }: TreeRowsProps) => {
   const { childNodes, getParentProps, depth, isBeingDragged } =
     useOrderedTreeNode(node)
 
-  console.log(
-    node.data.name,
-    isBeingDragged ? "IS being dragged" : "not being dragged"
-  )
   if (node.isPlaceholder) {
     return (
       <Placeholder>

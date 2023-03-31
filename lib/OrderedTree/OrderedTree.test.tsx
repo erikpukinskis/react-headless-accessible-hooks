@@ -64,8 +64,8 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Placeholder for First;- First;- Second;")
 
     expect(rows[0]).toHaveComputedStyle({
-      left: "0px",
-      top: "2px",
+      left: "0.0px",
+      top: "2.0px",
     })
 
     fireEvent.mouseMove(rows[0], {
@@ -85,7 +85,7 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
-  it.only("adds one node as a child of another", () => {
+  it("adds one node as a child of another", () => {
     const onOrderChange = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
@@ -121,6 +121,16 @@ describe("OrderedTree", () => {
       clientY: 32,
     })
 
+    // The height of the tree can vary a bit, depending on whether the node
+    // being dragged has popped out and the placeholder node has popped in, so
+    // we'll change the height here to stress test that:
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 40,
+      left: 0,
+      top: 0,
+    })
+
     expect(tree).toHaveTextContent(
       "- First;- Placeholder for Second;- Second;- Third;"
     )
@@ -134,14 +144,14 @@ describe("OrderedTree", () => {
       "v First;-- Placeholder for Second;- Second;- Third;"
     )
 
-    // fireEvent.mouseUp(rows[0], {
-    //   clientX: 10,
-    //   clientY: 20,
-    // })
+    fireEvent.mouseUp(rows[0], {
+      clientX: 51,
+      clientY: 30,
+    })
 
-    // expect(onOrderChange).toHaveBeenCalledWith("first", 0.8, null)
+    expect(onOrderChange).toHaveBeenCalledWith("second", 0.5, "first")
 
-    // expect(tree).toHaveTextContent("- Second- First")
+    expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 })
 
