@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   OrderedTreeProvider,
   useOrderedTree,
-  useOrderedTreeParent,
+  useOrderedTreeNode,
 } from "./useOrderedTree"
 import type {
   DatumFunctions,
@@ -42,7 +42,7 @@ describe("OrderedTree", () => {
 
     expect(rows).toHaveLength(2)
 
-    expect(tree).toHaveTextContent("- First- Second")
+    expect(tree).toHaveTextContent("- First;- Second;")
 
     layout.mockListBoundingRects(rows, {
       left: 0,
@@ -61,9 +61,7 @@ describe("OrderedTree", () => {
       clientY: 12,
     })
 
-    expect(tree).toHaveTextContent("- Placeholder for First- First- Second")
-
-    console.log("Checking for drag position on", rows[0].innerHTML)
+    expect(tree).toHaveTextContent("- Placeholder for First;- First;- Second;")
 
     expect(rows[0]).toHaveComputedStyle({
       left: "0px",
@@ -75,7 +73,7 @@ describe("OrderedTree", () => {
       clientY: 20,
     })
 
-    expect(tree).toHaveTextContent("- First- Second- Placeholder for First")
+    expect(tree).toHaveTextContent("- First;- Second;- Placeholder for First;")
 
     fireEvent.mouseUp(rows[0], {
       clientX: 10,
@@ -84,7 +82,66 @@ describe("OrderedTree", () => {
 
     expect(onOrderChange).toHaveBeenCalledWith("first", 0.8, null)
 
-    expect(tree).toHaveTextContent("- Second- First")
+    expect(tree).toHaveTextContent("- Second;- First;")
+  })
+
+  it.only("adds one node as a child of another", () => {
+    const onOrderChange = vi.fn()
+
+    const first = buildKin({ id: "first", order: 0.4, parentId: null })
+    const second = buildKin({ id: "second", order: 0.6, parentId: null })
+    const third = buildKin({ id: "third", order: 0.8, parentId: null })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [first, second, third],
+      onOrderChange,
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[1], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(rows[1], {
+      clientX: 10,
+      clientY: 32,
+    })
+
+    expect(tree).toHaveTextContent(
+      "- First;- Placeholder for Second;- Second;- Third;"
+    )
+
+    fireEvent.mouseMove(rows[1], {
+      clientX: 51, // We need to drag 40px to the right to trigger a re-parenting
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v First;-- Placeholder for Second;- Second;- Third;"
+    )
+
+    // fireEvent.mouseUp(rows[0], {
+    //   clientX: 10,
+    //   clientY: 20,
+    // })
+
+    // expect(onOrderChange).toHaveBeenCalledWith("first", 0.8, null)
+
+    // expect(tree).toHaveTextContent("- Second- First")
   })
 })
 
@@ -204,14 +261,16 @@ type TreeNodesProps = {
  *     ->> Grandkid
  */
 function TreeNode({ node }: TreeNodesProps) {
-  const { childNodes, getParentProps } = useOrderedTreeParent(node)
+  const { childNodes, getParentProps, depth } = useOrderedTreeNode(node)
 
-  const prefix = `-${node.parents.map(() => ">").join("")}`
+  const prefix = `${[...(Array(depth) as unknown[])].map(() => "-").join("")}${
+    node.isCollapsed ? ">" : childNodes.length > 0 ? "v" : "-"
+  }`
 
   if (node.isPlaceholder) {
     return (
       <div>
-        {prefix} Placeholder for {node.data.name}
+        {prefix} Placeholder for {node.data.name};
       </div>
     )
   }
@@ -219,7 +278,7 @@ function TreeNode({ node }: TreeNodesProps) {
   return (
     <>
       <div {...getParentProps()}>
-        {prefix} {node.data.name}
+        {prefix} {node.data.name};
       </div>
       {childNodes.map((child) => (
         <TreeNode key={child.key} node={child} />

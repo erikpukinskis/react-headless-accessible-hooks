@@ -56,13 +56,6 @@ export function getDrag<Datum>(
 
   data.dragDirection = dragDirection
 
-  if (dragDirection === "nowhere") {
-    return {
-      ...data,
-      move: "nowhere",
-    }
-  }
-
   const hoverDepth = (data.hoverDepth = hoverNode.parents.length)
 
   if (downRowIndex == null || dx == null) return data
@@ -78,10 +71,29 @@ export function getDrag<Datum>(
 
   const targetDepth = (data.roundedTargetDepth = Math.max(
     0,
-    Math.min(Math.round(rawTargetDepth), hoverDepth)
+    Math.min(Math.round(rawTargetDepth), hoverDepth + 1)
   ))
 
-  // if we are dragging down...
+  // either we are dragging sideways...
+
+  if (dragDirection === "nowhere") {
+    const nodeAbove = nodesByIndex[hoverIndex - 1]
+
+    if (!nodeAbove || nodeAbove.isCollapsed || targetDepth === hoverDepth) {
+      return {
+        ...data,
+        move: "nowhere",
+      }
+    }
+
+    return {
+      ...data,
+      move: "first-child",
+      relativeTo: nodeAbove,
+    }
+  }
+
+  // or we're dragging down...
 
   if (dragDirection === "down") {
     // if hoverNeed has (expanded) children, insert before first child of hoverNeed
@@ -120,7 +132,7 @@ export function getDrag<Datum>(
     }
   }
 
-  // if we are dragging up...
+  // otherwise we are dragging up...
 
   const previousNode = nodesByIndex[hoverIndex - 1]
 

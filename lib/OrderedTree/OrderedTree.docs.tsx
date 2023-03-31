@@ -4,7 +4,7 @@ import React, { useState } from "react"
 import type { OrderedTreeNode } from "./useOrderedTree"
 import {
   useOrderedTree,
-  useOrderedTreeParent,
+  useOrderedTreeNode,
   OrderedTreeProvider,
 } from "./useOrderedTree"
 import { useDumpDebugData } from "~/Debug"
@@ -177,7 +177,7 @@ const DraggableRow = styled(Row, {
 const Placeholder = styled(Row, {
   display: "flex",
   flexDirection: "row",
-  color: "rgba(0,0,0,0.6)",
+  borderRadius: 4,
 })
 
 const PlaceholderShadow = styled("div", {
@@ -193,14 +193,19 @@ type TreeRowsProps = {
 }
 
 const TreeRows = ({ node }: TreeRowsProps) => {
-  const { childNodes, getParentProps } = useOrderedTreeParent(node)
+  const { childNodes, getParentProps, depth, isBeingDragged } =
+    useOrderedTreeNode(node)
 
+  console.log(
+    node.data.name,
+    isBeingDragged ? "IS being dragged" : "not being dragged"
+  )
   if (node.isPlaceholder) {
     return (
       <Placeholder>
         <DepthIndicator
           id={node.id}
-          depth={node.parents.length}
+          depth={depth}
           isCollapsed={false}
           hasChildren={false}
         />
@@ -209,14 +214,15 @@ const TreeRows = ({ node }: TreeRowsProps) => {
     )
   }
 
-  const hasChildren = node.children.length > 0
+  const hasChildren = childNodes.length > 0
+
   return (
     <>
-      <DraggableRow {...getParentProps()} isBeingDragged={node.isBeingDragged}>
-        {node.isBeingDragged || (
+      <DraggableRow {...getParentProps()} isBeingDragged={isBeingDragged}>
+        {isBeingDragged || (
           <DepthIndicator
             id={node.id}
-            depth={node.parents.length}
+            depth={depth}
             isCollapsed={node.data.isCollapsed}
             hasChildren={hasChildren}
           />

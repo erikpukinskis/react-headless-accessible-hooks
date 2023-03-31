@@ -45,6 +45,10 @@ export type DragEnd = {
    * nothing happened.
    */
   parentId: string | null | undefined
+  /**
+   * The new depth of the node if we dropped it here
+   */
+  newDepth: number
 }
 
 export type PlaceholderListener = (
@@ -168,6 +172,16 @@ export class OrderedTreeModel<Datum> {
     return this.dragEnd?.order
   }
 
+  getPlaceholderDepth() {
+    if (!this.dragEnd) {
+      throw new Error(
+        "Can't get placeholder depth because we are not dragging anything"
+      )
+    }
+
+    return this.dragEnd.newDepth
+  }
+
   /**
    * Updates CSS positioning styles on the element being dragged
    */
@@ -188,14 +202,6 @@ export class OrderedTreeModel<Datum> {
 
     element.style.left = left
     element.style.top = top
-
-    console.log(
-      "Updating drag element position on",
-      element.innerHTML,
-      "to",
-      left,
-      top
-    )
 
     this.dump("drag position", `${left},${top}`)
   }
@@ -287,10 +293,12 @@ export class OrderedTreeModel<Datum> {
 
     let newOrder: number
     let newParentId: string | null
+    let newDepth: number
 
     if (dragData.move === "nowhere") {
       newOrder = assert(this.dragStart.originalOrder, "No original order")
       newParentId = this.getParentId(this.dragStart.node.data)
+      newDepth = this.dragStart.node.parents.length
     } else if (dragData.relativeTo === undefined) {
       throw new Error(
         "Why is relativeTo undefined if we're dragging somewhere?"
@@ -298,6 +306,7 @@ export class OrderedTreeModel<Datum> {
     } else if (dragData.move === "first-child") {
       newOrder = 0.5
       newParentId = dragData.relativeTo.id
+      newDepth = dragData.relativeTo.parents.length + 1
     } else {
       const newParent = dragData.relativeTo.parents[0]
       const siblings = newParent ? newParent.children : this.roots
@@ -311,12 +320,15 @@ export class OrderedTreeModel<Datum> {
       })
 
       newParentId = newParent?.id ?? null
+
+      newDepth = dragData.relativeTo.parents.length
     }
 
     const newDrag = {
       move: dragData.move,
       order: newOrder,
       parentId: newParentId,
+      newDepth,
     }
 
     if (isEqual(this.dragEnd, newDrag)) return

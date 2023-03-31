@@ -23,7 +23,6 @@ function buildNode({
     isCollapsed: false,
     index: 0,
     key: id,
-    isBeingDragged: false,
     isPlaceholder: false,
   }
 }

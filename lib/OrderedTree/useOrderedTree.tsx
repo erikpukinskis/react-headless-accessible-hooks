@@ -191,28 +191,32 @@ export function useOrderedTree<Datum>({
   }
 }
 
-export function useOrderedTreeParent<Datum>(
-  parentNode: OrderedTreeNode<Datum>
-) {
+export function useOrderedTreeNode<Datum>(node: OrderedTreeNode<Datum>) {
   const model = useModel<Datum>()
 
-  const childNodes = useChildNodes(parentNode.children, parentNode.id, model)
+  const childNodes = useChildNodes(node.children, node.id, model)
 
   const getParentProps = useCallback<GetNodeProps>(() => {
-    const key = parentNode.isPlaceholder
-      ? `${parentNode.id}-placeholder`
-      : parentNode.id
+    const key = node.isPlaceholder ? `${node.id}-placeholder` : node.id
 
     return {
-      onMouseDown: model.handleMouseDown.bind(model, parentNode),
+      onMouseDown: model.handleMouseDown.bind(model, node),
       key,
       role: "treeitem",
     }
-  }, [parentNode, model])
+  }, [node, model])
+
+  const depth = node.isPlaceholder
+    ? model.getPlaceholderDepth()
+    : node.parents.length
+
+  const isBeingDragged = model.isBeingDragged(node)
 
   return {
     childNodes,
     getParentProps,
+    depth,
+    isBeingDragged,
   }
 }
 

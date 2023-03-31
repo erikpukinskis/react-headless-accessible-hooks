@@ -49,7 +49,6 @@ export type OrderedTreeNode<Datum> = {
   parents: OrderedTreeNode<Datum>[]
   isLastChild: boolean
   isCollapsed: boolean
-  isBeingDragged: boolean
   isPlaceholder: boolean
   index: number
 }
@@ -115,7 +114,6 @@ function buildNodes<Datum>({
       parents: parents,
       isLastChild: index === orderedData.length - 1,
       isCollapsed: childData.length > 0 && isCollapsed(datum),
-      isBeingDragged: false,
       isPlaceholder: false,
       index: nodeIndex,
     }
