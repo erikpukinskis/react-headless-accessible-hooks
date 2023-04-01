@@ -286,6 +286,8 @@ export class OrderedTreeModel<Datum> {
 
     this.dump("move", dragData.move, relativeTo && get(relativeTo, "data.text"))
 
+    this.dump("target depth", dragData.roundedTargetDepth)
+
     // if (need.subneeds.length > 0) {
     //   setNeedIdToExpand(need.id)
     //   updateNeed(need, { collapse: true })

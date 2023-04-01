@@ -74,6 +74,10 @@ export function getDrag<Datum>(
     Math.min(Math.round(rawTargetDepth), hoverDepth + 1)
   ))
 
+  //////////////////////////////////
+  ////////////// 1 /////////////////
+  //////////////////////////////////
+
   // either we are dragging sideways...
 
   if (dragDirection === "nowhere") {
@@ -94,6 +98,10 @@ export function getDrag<Datum>(
       relativeTo: nodeAbove,
     }
   }
+
+  //////////////////////////////////
+  ////////////// 2 /////////////////
+  //////////////////////////////////
 
   // or we're dragging down...
 
@@ -134,9 +142,15 @@ export function getDrag<Datum>(
     }
   }
 
+  //////////////////////////////////
+  ////////////// 3 /////////////////
+  //////////////////////////////////
+
   // otherwise we are dragging up...
 
   const previousNode = nodesByIndex[hoverIndex - 1]
+
+  /// This is wrong:
 
   //  if the target depth is higher than the hoverNeed depth,
   //    1. grab the hoverNode - 1 parents (incl. hoverNeed - 1) starting at the
@@ -146,8 +160,17 @@ export function getDrag<Datum>(
   //       last child
   //    4. if the target depth is higher than hoverNeed - 1, and hoverNeed - 1
   //       is not collapsed, add it as the only child of hoverNeed - 1
+
   if (targetDepth > hoverDepth && previousNode) {
     const bestParent = getAncestorClosestToDepth(targetDepth, previousNode)
+
+    if (targetDepth > hoverDepth && !bestParent.isCollapsed) {
+      return {
+        ...data,
+        move: "first-child",
+        relativeTo: bestParent,
+      }
+    }
 
     return {
       ...data,
@@ -170,6 +193,12 @@ function getAncestorClosestToDepth(
 ) {
   const ancestors = getAncestorChain(node, depth)
 
+  if (ancestors.length < 1) {
+    console.log({ node, depth })
+    debugger
+    throw new Error("Ancestor chain always needs at least one node")
+  }
+
   let ancestorIndex = 0
 
   // Starting from the ancestor at the target depth, try to find an ancestor
@@ -177,9 +206,6 @@ function getAncestorClosestToDepth(
   for (let loop = 10; loop <= 10; loop++) {
     const ancestor = ancestors[ancestorIndex]
 
-    if (!ancestor) {
-      debugger
-    }
     if (ancestor.isLastChild) break
 
     if (!ancestors[ancestorIndex + 1]) break
@@ -212,7 +238,7 @@ export function getAncestorChain(
 ) {
   const nodeDepth = node.parents.length
 
-  if (targetDepth > nodeDepth) return []
+  if (targetDepth >= nodeDepth) return [node]
 
   const ancestorsStartingAtTargetDepth = []
 

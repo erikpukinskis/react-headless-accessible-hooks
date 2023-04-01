@@ -153,6 +153,94 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
+
+  it("places a child above its parent", () => {
+    const onOrderChange = vi.fn()
+
+    const first = buildKin({ id: "first", order: 0.5, parentId: null })
+    const second = buildKin({ id: "second", order: 0.5, parentId: "first" })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 40,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [first, second],
+      onOrderChange,
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    expect(tree).toHaveTextContent("v First;-- Second;")
+
+    fireEvent.mouseDown(rows[1], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(rows[1], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    fireEvent.mouseUp(rows[1], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    expect(onOrderChange).toHaveBeenCalledWith("second", 0.25, null)
+
+    expect(tree).toHaveTextContent("- Second;- First;")
+  })
+
+  it.only("drag a node up and to the right", () => {
+    const onOrderChange = vi.fn()
+
+    const first = buildKin({ id: "first", order: 0.4, parentId: null })
+    const second = buildKin({ id: "second", order: 0.6, parentId: null })
+    const third = buildKin({ id: "third", order: 0.8, parentId: null })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [first, second, third],
+      onOrderChange,
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[2], {
+      clientX: 10,
+      clientY: 50,
+    })
+
+    fireEvent.mouseMove(rows[2], {
+      clientX: 50,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v First;-- Placeholder for Third;- Second;- Third;"
+    )
+  })
 })
 
 /**
