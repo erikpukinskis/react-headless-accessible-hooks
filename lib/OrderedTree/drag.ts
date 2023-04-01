@@ -1,4 +1,5 @@
 import type { OrderedTreeNode } from "./buildTree"
+import { assert } from "~/helpers"
 
 type Direction = "up" | "down" | "nowhere"
 
@@ -74,133 +75,67 @@ export function getDrag<Datum>(
     Math.min(Math.round(rawTargetDepth), hoverDepth + 1)
   ))
 
-  //////////////////////////////////
-  ////////////// 1 /////////////////
-  //////////////////////////////////
+  // 1. Step 1 is to find a node above where we want to insert. We take care of
+  //    the one remaining case where we're not below another node (inserting
+  //    before the first item in the list.)
 
-  // either we are dragging sideways...
+  let nodeAbove: OrderedTreeNode<Datum>
 
-  if (dragDirection === "nowhere") {
-    const nodeAbove = nodesByIndex[hoverIndex - 1]
+  if (dragDirection === "down") {
+    nodeAbove = hoverNode
+  } else {
+    // Whether we're dragging up or nowhere, the result is the same: we want the
+    // node to be below the node above where we're hovering:
+    const previousNode = nodesByIndex[hoverIndex - 1]
 
-    if (!nodeAbove || targetDepth === hoverDepth) {
+    if (!previousNode && dragDirection === "nowhere") {
+      // We're dragging sideways on the first node in the list, this does nothing
       return {
         ...data,
         move: "nowhere",
       }
     }
 
-    if (targetDepth > hoverDepth && !nodeAbove.isCollapsed) {
-      return {
-        ...data,
-        move: "first-child",
-        relativeTo: nodeAbove,
-      }
-    }
-
-    if (
-      targetDepth < hoverDepth &&
-      hoverNode.parents[0]?.id === nodeAbove.id &&
-      nodeAbove.children.length === 1
-    ) {
-      return {
-        ...data,
-        move: "after",
-        relativeTo: nodeAbove,
-      }
-    }
-
-    return {
-      ...data,
-      move: "nowhere",
-    }
-  }
-
-  //////////////////////////////////
-  ////////////// 2 /////////////////
-  //////////////////////////////////
-
-  // or we're dragging down...
-
-  if (dragDirection === "down") {
-    // if hoverNeed has (expanded) children, insert before first child of hoverNeed
-    if (hoverNode.children.length > 0) {
+    if (!previousNode) {
+      // We're dragging up above the first item in the list, which we are hovering over
       return {
         ...data,
         move: "before",
-        relativeTo: hoverNode.children[0],
-      }
-    }
-
-    //  if targetDepth is higher than the hoverNeed depth, and hoverNeed is not collapsed, insert as first child of hoverNeed
-    if (targetDepth > hoverDepth && !hoverNode.isCollapsed) {
-      return {
-        ...data,
-        move: "first-child",
         relativeTo: hoverNode,
       }
     }
 
-    // if hoverNeed is not a last sibling, insert after hoverNeed
-    if (!hoverNode.isLastChild) {
-      return {
-        ...data,
-        move: "after",
-        relativeTo: hoverNode,
-      }
-    }
+    nodeAbove = previousNode
+  }
 
-    const bestParent = getAncestorClosestToDepth(targetDepth, hoverNode)
+  // 2. Now we know we're below the node in data.relativeTo. And we will default
+  //    to inserting after that node, we just need to handle these additional
+  //    situations:
+  //
+  //      a. inserting as a child of data.relativeTo
+  //
+  //      b. inserting after one of data.relativeTo's parents
+  //
+  //      c. dragging nowhere at all
+  //
+  //    ... what we do here depends on the targetDepth
 
+  const relativeDepth = nodeAbove.parents.length
+
+  if (targetDepth > relativeDepth && !nodeAbove.isCollapsed) {
     return {
       ...data,
-      move: "after",
-      relativeTo: bestParent,
+      move: "first-child",
+      relativeTo: nodeAbove,
     }
   }
 
-  //////////////////////////////////
-  ////////////// 3 /////////////////
-  //////////////////////////////////
+  const bestAncestor = getAncestorClosestToDepth(targetDepth, nodeAbove)
 
-  // otherwise we are dragging up...
-
-  const previousNode = nodesByIndex[hoverIndex - 1]
-
-  /// This is wrong:
-
-  //  if the target depth is higher than the hoverNeed depth,
-  //    1. grab the hoverNode - 1 parents (incl. hoverNeed - 1) starting at the
-  //       target depth
-  //    2. if the parent is a last child, insert after the parent
-  //    3. keep doing down the parents (incl. hoverNeed - 1) until you get to a
-  //       last child
-  //    4. if the target depth is higher than hoverNeed - 1, and hoverNeed - 1
-  //       is not collapsed, add it as the only child of hoverNeed - 1
-
-  if (targetDepth > hoverDepth && previousNode) {
-    const bestParent = getAncestorClosestToDepth(targetDepth, previousNode)
-
-    if (targetDepth > hoverDepth && !bestParent.isCollapsed) {
-      return {
-        ...data,
-        move: "first-child",
-        relativeTo: bestParent,
-      }
-    }
-
-    return {
-      ...data,
-      move: "after",
-      relativeTo: bestParent,
-    }
-  }
-
-  // otherwise insert before the hoverNeed:
   return {
     ...data,
-    move: "before",
-    relativeTo: hoverNode,
+    move: "after",
+    relativeTo: bestAncestor,
   }
 }
 

@@ -1,4 +1,4 @@
-export function assert<T>(maybe: T | undefined | null, message: string) {
+export function assert<T>(maybe: T | undefined | null, message: string): T {
   if (maybe == null) {
     throw new Error(
       message.replace("%s", maybe === null ? "null" : "undefined")
