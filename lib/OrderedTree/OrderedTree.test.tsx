@@ -22,7 +22,7 @@ describe("OrderedTree", () => {
 
   afterEach(layout.cleanup)
 
-  it("swaps two root nodes", () => {
+  it("swaps two nodes", () => {
     const onOrderChange = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
@@ -85,7 +85,7 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
-  it("adds one node as a child of another", () => {
+  it("places a node as a child of another", () => {
     const onOrderChange = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
@@ -154,7 +154,7 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 
-  it("places a child above its parent", () => {
+  it("places a child before its parent", () => {
     const onOrderChange = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.5, parentId: null })
@@ -201,9 +201,7 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
-  it.only("drag a node up and to the right", () => {
-    const onOrderChange = vi.fn()
-
+  it("reparents a node by dragging it up and to the right", () => {
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
     const third = buildKin({ id: "third", order: 0.8, parentId: null })
@@ -217,7 +215,6 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [first, second, third],
-      onOrderChange,
     })
 
     layout.mockListBoundingRects(rows, {
@@ -239,6 +236,43 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent(
       "v First;-- Placeholder for Third;- Second;- Third;"
+    )
+  })
+
+  it("can unparent an only child by dragging left", () => {
+    const first = buildKin({ id: "first", order: 0.5, parentId: null })
+    const second = buildKin({ id: "second", order: 0.5, parentId: "first" })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 40,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [first, second],
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[1], {
+      clientX: 50,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(rows[1], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent(
+      "- First;-- Second;- Placeholder for Second;"
     )
   })
 })
@@ -359,10 +393,14 @@ type TreeNodesProps = {
  *     ->> Grandkid
  */
 function TreeNode({ node }: TreeNodesProps) {
-  const { childNodes, getParentProps, depth } = useOrderedTreeNode(node)
+  const { childNodes, getParentProps, depth, childIsBeingDragged } =
+    useOrderedTreeNode(node)
+
+  const isExpanded =
+    childNodes.length > 1 || (childNodes.length === 1 && !childIsBeingDragged)
 
   const prefix = `${[...(Array(depth) as unknown[])].map(() => "-").join("")}${
-    node.isCollapsed ? ">" : childNodes.length > 0 ? "v" : "-"
+    node.isCollapsed ? ">" : isExpanded ? "v" : "-"
   }`
 
   if (node.isPlaceholder) {

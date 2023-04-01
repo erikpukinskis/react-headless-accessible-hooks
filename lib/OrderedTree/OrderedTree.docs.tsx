@@ -193,8 +193,13 @@ type TreeRowsProps = {
 }
 
 const TreeRows = ({ node }: TreeRowsProps) => {
-  const { childNodes, getParentProps, depth, isBeingDragged } =
-    useOrderedTreeNode(node)
+  const {
+    childNodes,
+    getParentProps,
+    depth,
+    isBeingDragged,
+    childIsBeingDragged,
+  } = useOrderedTreeNode(node)
 
   if (node.isPlaceholder) {
     return (
@@ -210,7 +215,8 @@ const TreeRows = ({ node }: TreeRowsProps) => {
     )
   }
 
-  const hasChildren = childNodes.length > 0
+  const hasChildren =
+    childNodes.length > 1 || (childNodes.length === 1 && !childIsBeingDragged)
 
   return (
     <>

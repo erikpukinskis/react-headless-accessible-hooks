@@ -83,19 +83,36 @@ export function getDrag<Datum>(
   if (dragDirection === "nowhere") {
     const nodeAbove = nodesByIndex[hoverIndex - 1]
 
-    if (!nodeAbove || nodeAbove.isCollapsed || targetDepth === hoverDepth) {
+    if (!nodeAbove || targetDepth === hoverDepth) {
       return {
         ...data,
         move: "nowhere",
       }
     }
 
-    // debugger
+    if (targetDepth > hoverDepth && !nodeAbove.isCollapsed) {
+      return {
+        ...data,
+        move: "first-child",
+        relativeTo: nodeAbove,
+      }
+    }
+
+    if (
+      targetDepth < hoverDepth &&
+      hoverNode.parents[0]?.id === nodeAbove.id &&
+      nodeAbove.children.length === 1
+    ) {
+      return {
+        ...data,
+        move: "after",
+        relativeTo: nodeAbove,
+      }
+    }
 
     return {
       ...data,
-      move: "first-child",
-      relativeTo: nodeAbove,
+      move: "nowhere",
     }
   }
 
@@ -194,8 +211,6 @@ function getAncestorClosestToDepth(
   const ancestors = getAncestorChain(node, depth)
 
   if (ancestors.length < 1) {
-    console.log({ node, depth })
-    debugger
     throw new Error("Ancestor chain always needs at least one node")
   }
 

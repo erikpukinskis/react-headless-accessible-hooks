@@ -12,7 +12,7 @@ import { buildTree } from "./buildTree"
 import type { PlaceholderListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
-import { makeUninitializedContext } from "~/helpers"
+import { assert, makeUninitializedContext } from "~/helpers"
 
 export type { OrderedTreeNode, DatumFunctions } from "./buildTree"
 
@@ -212,11 +212,14 @@ export function useOrderedTreeNode<Datum>(node: OrderedTreeNode<Datum>) {
 
   const isBeingDragged = model.isBeingDragged(node)
 
+  const childIsBeingDragged = model.childIsBeingDragged(node)
+
   return {
     childNodes,
     getParentProps,
     depth,
     isBeingDragged,
+    childIsBeingDragged,
   }
 }
 
@@ -254,13 +257,8 @@ function useChildNodes<Datum>(
         return nodes
       }
 
-      if (placeholderOrder === undefined) {
-        assertUniqueKeys(nodes)
-        return nodes
-      }
-
       const nodesWithPlaceholder = placeholderIsIncluded
-        ? model.getNodesWithPlaceholder(nodes, placeholderOrder)
+        ? model.getNodesWithPlaceholder(nodes)
         : nodes
 
       const nodesWithDraggedNodeMarked = nodesWithPlaceholder.map((node) => {

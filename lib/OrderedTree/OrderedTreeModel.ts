@@ -150,7 +150,7 @@ export class OrderedTreeModel<Datum> {
   /**
    * Splices a placeholder into the provided node array at the correct position
    */
-  getNodesWithPlaceholder(nodes: OrderedTreeNode<Datum>[], order: number) {
+  getNodesWithPlaceholder(nodes: OrderedTreeNode<Datum>[]) {
     const dragNode = this.dragStart?.node
 
     if (!dragNode) {
@@ -159,7 +159,19 @@ export class OrderedTreeModel<Datum> {
       )
     }
 
-    const nodesWithPlaceholder = splicePlaceholder(nodes, dragNode, order)
+    const { dragEnd } = this
+
+    if (!dragEnd) {
+      throw new Error(
+        "Expected to splice a placeholder into some nodes, but there was no mousemove yet"
+      )
+    }
+
+    const nodesWithPlaceholder = splicePlaceholder(
+      nodes,
+      dragNode,
+      dragEnd.order
+    )
 
     return nodesWithPlaceholder
   }
@@ -167,6 +179,14 @@ export class OrderedTreeModel<Datum> {
   isBeingDragged(node: OrderedTreeNode<Datum>) {
     if (!this.dragStart) return false
     return this.dragStart.node.id === node.id
+  }
+
+  childIsBeingDragged(node: OrderedTreeNode<Datum>) {
+    if (!this.dragStart) return false
+
+    const dragNodeParentId = this.getParentId(this.dragStart.node.data)
+
+    return node.id === dragNodeParentId
   }
 
   getNewOrder() {
