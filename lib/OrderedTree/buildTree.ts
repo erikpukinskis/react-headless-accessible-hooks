@@ -19,9 +19,20 @@ export function buildTree<Datum>({
   ...datumFunctions
 }: buildTreeArgs<Datum>) {
   console.log("Building tree")
+  console.log("zoom")
 
   const rootData = data.filter((datum) => !datumFunctions.getParentId(datum))
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
+
+  if (data.length > 0 && rootData.length < 1) {
+    if (import.meta.env.MODE !== "test") {
+      console.log(JSON.stringify(data, null, 4).slice(0, 500))
+    }
+
+    throw new Error(
+      "Every node in the tree had a parent... there should be at least one root node?"
+    )
+  }
 
   const { nodes, orderUpdates, nextIndex } = buildNodes({
     data,

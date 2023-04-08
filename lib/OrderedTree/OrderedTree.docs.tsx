@@ -88,12 +88,21 @@ const ORPHANS = [AUNTIE, MOMMA, TIO].map((sibling) => ({
 
 export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
 
-// export const WithCollapsedNode = (
-//   <Demo
-//     render={Template}
-//     props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
-//   />
-// )
+const toRootNode = (kin: Kin) => ({ ...kin, parentId: null })
+
+export const WithChild = (
+  <Demo
+    render={Template}
+    props={{ data: [toRootNode(AUNTIE), toRootNode(MOMMA), KIDDO] }}
+  />
+)
+
+export const WithCollapsedNode = (
+  <Demo
+    render={Template}
+    props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
+  />
+)
 
 type TemplateProps = {
   data: Kin[]
