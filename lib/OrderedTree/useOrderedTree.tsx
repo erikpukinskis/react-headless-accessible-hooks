@@ -139,9 +139,6 @@ export function useOrderedTree<Datum>({
       })
   )
 
-  if (!model) {
-    throw new Error("no model 1")
-  }
   const rootsWithDragNode = useChildNodes(tree.roots, null, model)
 
   useEffect(() => {
@@ -223,32 +220,50 @@ export function useOrderedTreeNode<Datum>(node: OrderedTreeNode<Datum>) {
   }
 }
 
+let num = 0
+let parent = 0
+
 function useChildNodes<Datum>(
   nodes: OrderedTreeNode<Datum>[],
   parentId: string | null,
   model: OrderedTreeModel<Datum>
 ) {
+  const [mountId] = useState(() => {
+    parent++
+    return `mount-${parent}`
+  })
+
   const [placeholderIsIncluded, setPlaceholderIncluded] = useState(false)
   const [placeholderOrder, setPlaceholderOrder] = useState<number | undefined>(
     undefined
   )
 
-  useEffect(
-    function listenForPlaceholder() {
-      const handlePlaceholderChange: PlaceholderListener = (
-        isIncludedNow,
-        order
-      ) => {
-        setPlaceholderIncluded(isIncludedNow)
-        setPlaceholderOrder(order)
-      }
+  useEffect(() => {
+    console.log("mounting", mountId)
 
-      model.addPlaceholderListener(parentId, handlePlaceholderChange)
+    return () => console.log("UN-mounting", mountId)
+  }, [])
 
-      return () => model.removePlaceholderListener(parentId)
-    },
-    [model, parentId]
-  )
+  useEffect(() => {
+    num++
+    const id = `effect-${num}`
+    console.log("running", id, "in", mountId, `data=${parentId ?? "null"}`)
+
+    const handlePlaceholderChange: PlaceholderListener = (
+      isIncludedNow,
+      order
+    ) => {
+      setPlaceholderIncluded(isIncludedNow)
+      setPlaceholderOrder(order)
+    }
+
+    model.addPlaceholderListener(parentId, handlePlaceholderChange)
+
+    return () => {
+      console.log("cleanup", id, "in", mountId, `data=${parentId ?? "null"}`)
+      model.removePlaceholderListener(parentId, handlePlaceholderChange)
+    }
+  }, [model, parentId])
 
   const childNodes = useMemo(
     function buildChildNodes() {

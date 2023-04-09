@@ -67,13 +67,16 @@ export function getDrag<Datum>(
 
   const downDepth = (data.downDepth = downNode.parents.length)
   const drift = dx / 40
+  const rawTargetDepth = downDepth + drift
 
-  const rawTargetDepth = (data.targetDepth = downDepth + drift)
+  data.targetDepth = rawTargetDepth
 
-  const targetDepth = (data.roundedTargetDepth = Math.max(
+  const targetDepth = Math.max(
     0,
     Math.min(Math.round(rawTargetDepth), hoverDepth + 1)
-  ))
+  )
+
+  data.roundedTargetDepth = targetDepth
 
   // 1. Step 1 is to find a node above where we want to insert. We take care of
   //    the one remaining case where we're not below another node (inserting

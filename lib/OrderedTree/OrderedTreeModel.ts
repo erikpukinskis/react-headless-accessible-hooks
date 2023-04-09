@@ -257,7 +257,13 @@ export class OrderedTreeModel<Datum> {
   /**
    * On unmount, `useOrderedTreeChildNodes` removes its listener.
    */
-  removePlaceholderListener(nodeId: string | null) {
+  removePlaceholderListener(
+    nodeId: string | null,
+    listener: PlaceholderListener
+  ) {
+    if (this.dragChildListenersById[nodeId ?? NoParent] !== listener) {
+      return
+    }
     delete this.dragChildListenersById[nodeId ?? NoParent]
   }
 

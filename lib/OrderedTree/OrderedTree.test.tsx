@@ -154,6 +154,90 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 
+  it.only("can drag a node UP and then move the one that WAS above over to the right", () => {
+    const onOrderChange = vi.fn()
+
+    const first = buildKin({ id: "first", order: 0.4, parentId: null })
+    const second = buildKin({ id: "second", order: 0.6, parentId: null })
+    const third = buildKin({ id: "third", order: 0.8, parentId: null })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const {
+      rows: [firstRow, secondRow],
+      tree,
+    } = renderTree({
+      data: [first, second],
+      onOrderChange,
+    })
+
+    layout.mockListBoundingRects([firstRow, secondRow], {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    expect(tree).toHaveTextContent("- First;- Second;")
+
+    // First swap the nodes:
+
+    fireEvent.mouseDown(secondRow, {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(secondRow, {
+      clientX: 10,
+      clientY: 15,
+    })
+
+    expect(tree).toHaveTextContent("- Placeholder for Second;- First;- Second;")
+
+    fireEvent.mouseUp(secondRow, {
+      clientX: 10,
+      clientY: 15,
+    })
+
+    expect(tree).toHaveTextContent("- Second;- First;")
+
+    layout.mockListBoundingRects([secondRow, firstRow], {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    // Now start dragging the one that was swapped down...
+
+    fireEvent.mouseDown(firstRow, {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(firstRow, {
+      clientX: 10,
+      clientY: 31,
+    })
+
+    expect(tree).toHaveTextContent("- Second;- Placeholder for First;- First;")
+
+    // And then drag to the right:
+
+    fireEvent.mouseMove(firstRow, {
+      clientX: 51,
+      clientY: 31,
+    })
+
+    return
+    expect(tree).toHaveTextContent("v First;- Second;-- Placeholder for First;")
+  })
+
   it("places a child before its parent", () => {
     const onOrderChange = vi.fn()
 
