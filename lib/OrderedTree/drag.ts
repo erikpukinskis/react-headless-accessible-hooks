@@ -1,5 +1,4 @@
 import type { OrderedTreeNode } from "./buildTree"
-import { assert } from "~/helpers"
 
 type Direction = "up" | "down" | "nowhere"
 

@@ -18,9 +18,7 @@ export function buildTree<Datum>({
   data,
   ...datumFunctions
 }: buildTreeArgs<Datum>) {
-  console.log("Building tree")
-  console.log("zoom")
-
+  console.log("\nBuilding tree")
   const rootData = data.filter((datum) => !datumFunctions.getParentId(datum))
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
 

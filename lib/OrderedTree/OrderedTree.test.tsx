@@ -154,12 +154,11 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 
-  it.only("can drag a node UP and then move the one that WAS above over to the right", () => {
+  it("can still drag a node right after you swapped one above it", () => {
     const onOrderChange = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
-    const third = buildKin({ id: "third", order: 0.8, parentId: null })
 
     layout.mockRoleBoundingRects("tree", {
       width: 200,
@@ -171,10 +170,13 @@ describe("OrderedTree", () => {
     const {
       rows: [firstRow, secondRow],
       tree,
+      dump,
     } = renderTree({
       data: [first, second],
       onOrderChange,
     })
+
+    dump()
 
     layout.mockListBoundingRects([firstRow, secondRow], {
       left: 0,
@@ -185,7 +187,7 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent("- First;- Second;")
 
-    // First swap the nodes:
+    // First drag the second node up above the first
 
     fireEvent.mouseDown(secondRow, {
       clientX: 10,
@@ -213,7 +215,7 @@ describe("OrderedTree", () => {
       height: 20,
     })
 
-    // Now start dragging the one that was swapped down...
+    // Now to drag the (former) first node over
 
     fireEvent.mouseDown(firstRow, {
       clientX: 10,
@@ -234,8 +236,7 @@ describe("OrderedTree", () => {
       clientY: 31,
     })
 
-    return
-    expect(tree).toHaveTextContent("v First;- Second;-- Placeholder for First;")
+    expect(tree).toHaveTextContent("v Second;-- Placeholder for First;- First;")
   })
 
   it("places a child before its parent", () => {
@@ -455,7 +456,7 @@ function Tree({ data: initialData, onOrderChange, ...overrides }: TreeProps) {
     <OrderedTreeProvider model={model}>
       <div {...getTreeProps()}>
         {roots.map((node) => (
-          <TreeNode key={node.key} node={node} />
+          <TreeNode key={log(node.key, "root")} node={node} />
         ))}
       </div>
     </OrderedTreeProvider>
@@ -501,8 +502,13 @@ function TreeNode({ node }: TreeNodesProps) {
         {prefix} {node.data.name};
       </div>
       {childNodes.map((child) => (
-        <TreeNode key={child.key} node={child} />
+        <TreeNode key={log(child.key, "child")} node={child} />
       ))}
     </>
   )
+}
+
+function log<T>(thing: T, label: string) {
+  console.log(label, String(thing))
+  return thing
 }

@@ -12,7 +12,7 @@ import { buildTree } from "./buildTree"
 import type { PlaceholderListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
-import { assert, makeUninitializedContext } from "~/helpers"
+import { makeUninitializedContext } from "~/helpers"
 
 export type { OrderedTreeNode, DatumFunctions } from "./buildTree"
 
@@ -139,7 +139,7 @@ export function useOrderedTree<Datum>({
       })
   )
 
-  const rootsWithDragNode = useChildNodes(tree.roots, null, model)
+  const rootsWithDragNode = useChildNodes(tree.roots, null, model, false)
 
   useEffect(() => {
     const newTree = buildTree({
@@ -191,7 +191,12 @@ export function useOrderedTree<Datum>({
 export function useOrderedTreeNode<Datum>(node: OrderedTreeNode<Datum>) {
   const model = useModel<Datum>()
 
-  const childNodes = useChildNodes(node.children, node.id, model)
+  const childNodes = useChildNodes(
+    node.children,
+    node.id,
+    model,
+    node.isPlaceholder
+  )
 
   const getParentProps = useCallback<GetNodeProps>(() => {
     const key = node.isPlaceholder ? `${node.id}-placeholder` : node.id
@@ -220,34 +225,19 @@ export function useOrderedTreeNode<Datum>(node: OrderedTreeNode<Datum>) {
   }
 }
 
-let num = 0
-let parent = 0
-
 function useChildNodes<Datum>(
   nodes: OrderedTreeNode<Datum>[],
   parentId: string | null,
-  model: OrderedTreeModel<Datum>
+  model: OrderedTreeModel<Datum>,
+  isPlaceholder: boolean
 ) {
-  const [mountId] = useState(() => {
-    parent++
-    return `mount-${parent}`
-  })
-
   const [placeholderIsIncluded, setPlaceholderIncluded] = useState(false)
   const [placeholderOrder, setPlaceholderOrder] = useState<number | undefined>(
     undefined
   )
 
   useEffect(() => {
-    console.log("mounting", mountId)
-
-    return () => console.log("UN-mounting", mountId)
-  }, [])
-
-  useEffect(() => {
-    num++
-    const id = `effect-${num}`
-    console.log("running", id, "in", mountId, `data=${parentId ?? "null"}`)
+    if (isPlaceholder) return
 
     const handlePlaceholderChange: PlaceholderListener = (
       isIncludedNow,
@@ -260,13 +250,14 @@ function useChildNodes<Datum>(
     model.addPlaceholderListener(parentId, handlePlaceholderChange)
 
     return () => {
-      console.log("cleanup", id, "in", mountId, `data=${parentId ?? "null"}`)
       model.removePlaceholderListener(parentId, handlePlaceholderChange)
     }
-  }, [model, parentId])
+  }, [model, parentId, isPlaceholder])
 
   const childNodes = useMemo(
     function buildChildNodes() {
+      if (isPlaceholder) return []
+
       if (!model.dragStart) {
         assertUniqueKeys(nodes)
         return nodes
@@ -276,6 +267,7 @@ function useChildNodes<Datum>(
         ? model.getNodesWithPlaceholder(nodes)
         : nodes
 
+      /// Wait, shouldn't we be passing a fresh placeholderOrder here? Is this not causing a problem?
       const nodesWithDraggedNodeMarked = nodesWithPlaceholder.map((node) => {
         if (model.isBeingDragged(node)) {
           return {
@@ -291,7 +283,7 @@ function useChildNodes<Datum>(
 
       return nodesWithDraggedNodeMarked
     },
-    [model, nodes, placeholderIsIncluded, placeholderOrder]
+    [model, nodes, placeholderIsIncluded, placeholderOrder, isPlaceholder]
   )
 
   return childNodes
