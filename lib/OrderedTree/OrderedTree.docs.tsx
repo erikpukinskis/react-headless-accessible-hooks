@@ -93,7 +93,13 @@ const toRootNode = (kin: Kin) => ({ ...kin, parentId: null })
 export const WithChild = (
   <Demo
     render={Template}
-    props={{ data: [toRootNode(AUNTIE), toRootNode(MOMMA), KIDDO] }}
+    props={{
+      data: [
+        { ...toRootNode(MOMMA), order: 0.2 },
+        KIDDO,
+        { ...toRootNode(AUNTIE), order: 0.4 },
+      ],
+    }}
   />
 )
 

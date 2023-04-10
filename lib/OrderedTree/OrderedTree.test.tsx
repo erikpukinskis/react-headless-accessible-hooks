@@ -154,6 +154,69 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 
+  it("drags right to place a node as second child", () => {
+    const onOrderChange = vi.fn()
+
+    const parent = buildKin({ id: "parent", order: 0.2, parentId: null })
+    const child = buildKin({ id: "child", order: 0.5, parentId: "parent" })
+    const secondChild = buildKin({
+      id: "third",
+      order: 0.6,
+      parentId: null,
+    })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [parent, child, secondChild],
+      onOrderChange,
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[2], {
+      clientX: 10,
+      clientY: 50,
+    })
+
+    fireEvent.mouseMove(rows[2], {
+      clientX: 11,
+      clientY: 50,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v Parent;-- Child;- Placeholder for Third;- Third;"
+    )
+
+    fireEvent.mouseMove(rows[2], {
+      clientX: 51,
+      clientY: 50,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v Parent;-- Child;-- Placeholder for Third;- Third;"
+    )
+
+    fireEvent.mouseMove(rows[2], {
+      clientX: 91,
+      clientY: 50,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v Parent;-v Child;--- Placeholder for Third;- Third;"
+    )
+  })
+
   it("can still drag a node right after you swapped one above it", () => {
     const onOrderChange = vi.fn()
 

@@ -1,5 +1,7 @@
 import type { OrderedTreeNode } from "./buildTree"
 
+const MAX_LOOP = 10
+
 type Direction = "up" | "down" | "nowhere"
 
 export type DragData = {
@@ -64,19 +66,6 @@ export function getDrag<Datum>(
 
   data.downNode = downNode
 
-  const downDepth = (data.downDepth = downNode.parents.length)
-  const drift = dx / 40
-  const rawTargetDepth = downDepth + drift
-
-  data.targetDepth = rawTargetDepth
-
-  const targetDepth = Math.max(
-    0,
-    Math.min(Math.round(rawTargetDepth), hoverDepth + 1)
-  )
-
-  data.roundedTargetDepth = targetDepth
-
   // 1. Step 1 is to find a node above where we want to insert. We take care of
   //    the one remaining case where we're not below another node (inserting
   //    before the first item in the list.)
@@ -123,7 +112,19 @@ export function getDrag<Datum>(
   //    ... what we do here depends on the targetDepth
 
   const relativeDepth = nodeAbove.parents.length
+  const downDepth = (data.downDepth = downNode.parents.length)
+  const drift = dx / 40
+  const rawTargetDepth = downDepth + drift
+  const targetDepth = Math.max(
+    0,
+    Math.min(Math.round(rawTargetDepth), relativeDepth + 1)
+  )
 
+  data.targetDepth = rawTargetDepth
+  data.roundedTargetDepth = targetDepth
+
+  // If we're dragging farther right than the depth of the row above, we should
+  // be able to insert as the first child (assuming it's not a collapsed node)
   if (targetDepth > relativeDepth && !nodeAbove.isCollapsed) {
     return {
       ...data,
@@ -135,6 +136,9 @@ export function getDrag<Datum>(
   const draggingOnlyChild =
     nodeAbove.children.length === 1 && nodeAbove.children[0].id === downNode.id
 
+  // If the node above where we're dragging has children, we should be able to
+  // insert above the first child, as long as we're not dragging the first
+  // child!
   if (nodeAbove.children.length > 0 && !draggingOnlyChild) {
     return {
       ...data,
@@ -143,6 +147,7 @@ export function getDrag<Datum>(
     }
   }
 
+  // Otherwise we want to insert after the node above (or one of its parents)
   const bestAncestor = getAncestorClosestToDepth(targetDepth, nodeAbove)
 
   return {
@@ -153,10 +158,10 @@ export function getDrag<Datum>(
 }
 
 function getAncestorClosestToDepth(
-  depth: number,
+  targetDepth: number,
   node: OrderedTreeNode<unknown>
 ) {
-  const ancestors = getAncestorChain(node, depth)
+  const ancestors = getAncestorChain(node, targetDepth)
 
   if (ancestors.length < 1) {
     throw new Error("Ancestor chain always needs at least one node")
@@ -165,24 +170,32 @@ function getAncestorClosestToDepth(
   let ancestorIndex = 0
 
   // Starting from the ancestor at the target depth, try to find an ancestor
-  // that's a last sibling. Otherwise return the hoverNeed.
-  for (let loop = 10; loop <= 10; loop++) {
+  // that's a last sibling so we can insert after it
+  for (let loop = targetDepth; loop <= MAX_LOOP; loop++) {
     const ancestor = ancestors[ancestorIndex]
 
-    if (ancestor.isLastChild) break
+    /// Why do we care if it's a last child? We care if the _next_ ancestor is the last child
+    const baby = ancestors[ancestorIndex + 1]
 
-    if (!ancestors[ancestorIndex + 1]) break
-    ancestorIndex++
-
-    if (loop === 10) {
-      throw new Error("We don't support need depths greater than 10")
+    if (!baby) {
+      // There are no more ancestors after this, so the current ancestor is the
+      // node above the hover node, and none of the parents are suitable
+      // relative nodes, so this ancestor is the best we can do.
+      return ancestor
     }
+
+    if (baby.isLastChild) {
+      // The ancestor is a good depth, and there are no more siblings below
+      // here, so we can insert after the ancestor
+      return ancestor
+    }
+
+    // Keep trying
+    ancestorIndex++
   }
 
-  return ancestors[ancestorIndex]
+  throw new Error(`We don't support need depths greater than ${MAX_LOOP}`)
 }
-
-const MAX_LOOP = 10
 
 /**
  * Returns an array of parents for a given node, plus the node itself, starting
