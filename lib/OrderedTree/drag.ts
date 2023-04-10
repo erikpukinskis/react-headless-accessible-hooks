@@ -132,6 +132,17 @@ export function getDrag<Datum>(
     }
   }
 
+  const draggingOnlyChild =
+    nodeAbove.children.length === 1 && nodeAbove.children[0].id === downNode.id
+
+  if (nodeAbove.children.length > 0 && !draggingOnlyChild) {
+    return {
+      ...data,
+      move: "first-child",
+      relativeTo: nodeAbove,
+    }
+  }
+
   const bestAncestor = getAncestorClosestToDepth(targetDepth, nodeAbove)
 
   return {

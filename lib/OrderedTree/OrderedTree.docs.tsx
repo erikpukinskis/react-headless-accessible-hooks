@@ -80,7 +80,7 @@ const COUSIN: Kin = {
   isCollapsed: false,
 }
 
-const ORPHANS = [AUNTIE, MOMMA].map((sibling) => ({
+const ORPHANS = [AUNTIE, MOMMA, TIO].map((sibling) => ({
   ...sibling,
   parentId: null,
   isCollapsed: false,

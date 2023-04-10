@@ -360,6 +360,46 @@ describe("OrderedTree", () => {
       "- First;-- Second;- Placeholder for Second;"
     )
   })
+
+  it("drags a node before the first child under a parent", () => {
+    const daughter = buildKin({ id: "daughter", order: 0.2, parentId: null })
+    const momma = buildKin({ id: "momma", order: 0.6, parentId: null })
+    const kiddo = buildKin({ id: "kiddo", order: 0.5, parentId: "momma" })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [daughter, momma, kiddo],
+    })
+
+    expect(tree).toHaveTextContent("- Daughter;v Momma;-- Kiddo;")
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[0], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    fireEvent.mouseMove(rows[0], {
+      clientX: 10,
+      clientY: 20,
+    })
+
+    expect(tree).toHaveTextContent(
+      "- Daughter;v Momma;-- Placeholder for Daughter;-- Kiddo;"
+    )
+  })
 })
 
 /**
