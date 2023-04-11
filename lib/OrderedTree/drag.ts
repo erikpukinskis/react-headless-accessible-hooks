@@ -58,7 +58,7 @@ export function getDrag<Datum>(
 
   data.dragDirection = dragDirection
 
-  const hoverDepth = (data.hoverDepth = hoverNode.parents.length)
+  data.hoverDepth = hoverNode.parents.length
 
   if (downRowIndex == null || dx == null) return data
 

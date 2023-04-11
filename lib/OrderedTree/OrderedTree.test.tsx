@@ -154,7 +154,7 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 
-  it("drags right to place a node as second child", () => {
+  it("drags right to place a node as grandchild", () => {
     const onOrderChange = vi.fn()
 
     const parent = buildKin({ id: "parent", order: 0.2, parentId: null })
@@ -215,6 +215,97 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent(
       "v Parent;-v Child;--- Placeholder for Third;- Third;"
     )
+  })
+
+  it("drags two nodes right", () => {
+    const onOrderChange = vi.fn()
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [
+        buildKin({ id: "parent", order: 0.2, parentId: null }),
+        buildKin({ id: "son", order: 0.4, parentId: null }),
+        buildKin({
+          id: "daughter",
+          order: 0.6,
+          parentId: null,
+        }),
+      ],
+      onOrderChange,
+    })
+
+    const [_, son, daughter] = rows
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(son, {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent("- Parent;- Son;- Daughter;")
+
+    fireEvent.mouseMove(son, {
+      clientX: 11,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent(
+      "- Parent;- Placeholder for Son;- Son;- Daughter;"
+    )
+
+    fireEvent.mouseMove(son, {
+      clientX: 50,
+      clientY: 30,
+    })
+
+    fireEvent.mouseUp(son, {
+      clientX: 50,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent("v Parent;-- Son;- Daughter;")
+
+    fireEvent.mouseDown(daughter, {
+      clientX: 10,
+      clientY: 50,
+    })
+
+    fireEvent.mouseMove(daughter, {
+      clientX: 11,
+      clientY: 50,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v Parent;-- Son;- Placeholder for Daughter;- Daughter;"
+    )
+
+    fireEvent.mouseMove(daughter, {
+      clientX: 50,
+      clientY: 50,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v Parent;-- Son;-- Placeholder for Daughter;- Daughter;"
+    )
+
+    fireEvent.mouseUp(daughter, {
+      clientX: 50,
+      clientY: 50,
+    })
+
+    expect(tree).toHaveTextContent("v Parent;-- Son;-- Daughter;")
   })
 
   it("can still drag a node right after you swapped one above it", () => {

@@ -25,16 +25,6 @@ type TreeBox = {
 
 export type DragEnd = {
   /**
-   * What kind of node move the drag will result in if dropped here:
-   *
-   *  - `"nowhere"` — the node wasn't moved out of its original position
-   *  - `"before"` — place the node before an existing sibling
-   *  - `"after"` — place the node after an existing sibling
-   *  - `"first-child"` — the node will become the first child of a parent that
-   *    currently has no children
-   */
-  move: "nowhere" | "before" | "after" | "first-child"
-  /**
    * Number between 0 and 1 representing the node's position within its siblings
    */
   order: number
@@ -82,6 +72,12 @@ type OrderedTreeModelArgs<Datum> = {
 
 const NoParent = Symbol("NoParent")
 
+type OrderChangeHandler = (
+  id: string,
+  newOrder: number,
+  newParentId: string | null
+) => void
+
 export class OrderedTreeModel<Datum> {
   clientX = NaN
   clientY = NaN
@@ -98,11 +94,7 @@ export class OrderedTreeModel<Datum> {
   dragChildListenersById: Partial<
     Record<string | typeof NoParent, PlaceholderListener>
   > = {}
-  onOrderChange: (
-    id: string,
-    newOrder: number,
-    newParentId: string | null
-  ) => void
+  onOrderChange: OrderChangeHandler
 
   constructor({
     nodesByIndex,
@@ -131,6 +123,10 @@ export class OrderedTreeModel<Datum> {
 
     window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
+  }
+
+  setOrderChangeCallback(callback: OrderChangeHandler) {
+    this.onOrderChange = callback
   }
 
   setData(
@@ -310,7 +306,7 @@ export class OrderedTreeModel<Datum> {
 
     const { relativeTo } = dragData
 
-    this.dump("move", dragData.move, relativeTo && get(relativeTo, "data.text"))
+    this.dump("move", dragData.move, relativeTo && get(relativeTo, "data.name"))
 
     this.dump("target depth", dragData.roundedTargetDepth)
 
@@ -353,7 +349,6 @@ export class OrderedTreeModel<Datum> {
     }
 
     const newDrag = {
-      move: dragData.move,
       order: newOrder,
       parentId: newParentId,
       newDepth,
@@ -375,6 +370,7 @@ export class OrderedTreeModel<Datum> {
     const oldOrder = this.dragEnd?.order
 
     this.dragEnd = newDrag
+    console.log("new dragEnd", newDrag)
 
     // If there was already a dragEnd previously, there will be an oldParentId
     // here, which means the placeholder has already been placed amidst some

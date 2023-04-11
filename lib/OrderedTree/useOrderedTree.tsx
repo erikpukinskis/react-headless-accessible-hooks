@@ -139,6 +139,10 @@ export function useOrderedTree<Datum>({
       })
   )
 
+  useEffect(() => {
+    model.setOrderChangeCallback(onOrderChange)
+  }, [model, onOrderChange])
+
   const rootsWithDragNode = useChildNodes(tree.roots, null, model, false)
 
   useEffect(() => {
