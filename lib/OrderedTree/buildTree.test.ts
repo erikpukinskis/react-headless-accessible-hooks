@@ -162,10 +162,10 @@ describe("buildTree", () => {
   })
 
   it("should provide updates for all needs", () => {
-    const { orderUpdates } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
+    const { missingOrders } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
 
-    const updates = orderUpdates.reduce(
-      (updates, { id, order }) => ({
+    const updates = Object.entries(missingOrders).reduce(
+      (updates, [id, order]) => ({
         ...updates,
         [id]: order,
       }),

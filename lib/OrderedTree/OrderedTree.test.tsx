@@ -23,7 +23,7 @@ describe("OrderedTree", () => {
   afterEach(layout.cleanup)
 
   it("swaps two nodes", () => {
-    const onOrderChange = vi.fn()
+    const moveNode = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
@@ -37,7 +37,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [first, second],
-      onOrderChange,
+      moveNode,
     })
 
     expect(rows).toHaveLength(2)
@@ -80,13 +80,13 @@ describe("OrderedTree", () => {
       clientY: 20,
     })
 
-    expect(onOrderChange).toHaveBeenCalledWith("first", 0.8, null)
+    expect(moveNode).toHaveBeenCalledWith("first", 0.8, null)
 
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
   it("places a node as a child of another", () => {
-    const onOrderChange = vi.fn()
+    const moveNode = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
@@ -101,7 +101,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [first, second, third],
-      onOrderChange,
+      moveNode,
     })
 
     layout.mockListBoundingRects(rows, {
@@ -149,13 +149,13 @@ describe("OrderedTree", () => {
       clientY: 30,
     })
 
-    expect(onOrderChange).toHaveBeenCalledWith("second", 0.5, "first")
+    expect(moveNode).toHaveBeenCalledWith("second", 0.5, "first")
 
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 
   it("drags right to place a node as grandchild", () => {
-    const onOrderChange = vi.fn()
+    const moveNode = vi.fn()
 
     const parent = buildKin({ id: "parent", order: 0.2, parentId: null })
     const child = buildKin({ id: "child", order: 0.5, parentId: "parent" })
@@ -174,7 +174,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [parent, child, secondChild],
-      onOrderChange,
+      moveNode,
     })
 
     layout.mockListBoundingRects(rows, {
@@ -218,7 +218,7 @@ describe("OrderedTree", () => {
   })
 
   it("drags two nodes right", () => {
-    const onOrderChange = vi.fn()
+    const moveNode = vi.fn()
 
     layout.mockRoleBoundingRects("tree", {
       width: 200,
@@ -237,7 +237,7 @@ describe("OrderedTree", () => {
           parentId: null,
         }),
       ],
-      onOrderChange,
+      moveNode,
     })
 
     const [_, son, daughter] = rows
@@ -309,7 +309,7 @@ describe("OrderedTree", () => {
   })
 
   it("can still drag a node right after you swapped one above it", () => {
-    const onOrderChange = vi.fn()
+    const moveNode = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
@@ -327,7 +327,7 @@ describe("OrderedTree", () => {
       dump,
     } = renderTree({
       data: [first, second],
-      onOrderChange,
+      moveNode,
     })
 
     dump()
@@ -394,7 +394,7 @@ describe("OrderedTree", () => {
   })
 
   it("places a child before its parent", () => {
-    const onOrderChange = vi.fn()
+    const moveNode = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.5, parentId: null })
     const second = buildKin({ id: "second", order: 0.5, parentId: "first" })
@@ -408,7 +408,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [first, second],
-      onOrderChange,
+      moveNode,
     })
 
     layout.mockListBoundingRects(rows, {
@@ -435,7 +435,7 @@ describe("OrderedTree", () => {
       clientY: 10,
     })
 
-    expect(onOrderChange).toHaveBeenCalledWith("second", 0.25, null)
+    expect(moveNode).toHaveBeenCalledWith("second", 0.25, null)
 
     expect(tree).toHaveTextContent("- Second;- First;")
   })
@@ -618,7 +618,7 @@ type TreeProps = Partial<UseOrderedTreeArgs<Kin>> & {
 /**
  * Test tree component
  */
-function Tree({ data: initialData, onOrderChange, ...overrides }: TreeProps) {
+function Tree({ data: initialData, moveNode, ...overrides }: TreeProps) {
   const [data, setData] = useState(initialData)
 
   function handleOrderChange(
@@ -636,11 +636,11 @@ function Tree({ data: initialData, onOrderChange, ...overrides }: TreeProps) {
         kin.parentId = newParentId
       })
     )
-    onOrderChange?.(id, newOrder, newParentId)
+    moveNode?.(id, newOrder, newParentId)
   }
 
   const { roots, getTreeProps, model } = useOrderedTree({
-    onOrderChange: handleOrderChange,
+    moveNode: handleOrderChange,
     data,
     ...DATUM_FUNCTIONS,
     ...overrides,

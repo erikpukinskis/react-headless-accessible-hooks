@@ -121,7 +121,7 @@ function Template({ data: initialData }: TemplateProps) {
 
   const { roots, getTreeProps, model } = useOrderedTree({
     data,
-    onOrderChange(id, newOrder, newParentId) {
+    moveNode(id, newOrder, newParentId) {
       const index = data.findIndex((datum) => datum.id === id)
       const oldDatum = data[index]
 

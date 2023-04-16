@@ -32,7 +32,7 @@ export function buildTree<Datum>({
     )
   }
 
-  const { nodes, orderUpdates, nextIndex } = buildNodes({
+  const { nodes, missingOrders, nextIndex } = buildSiblingNodes({
     data,
     ...datumFunctions,
     siblingData: rootData,
@@ -41,12 +41,7 @@ export function buildTree<Datum>({
     parents: [],
   })
 
-  return { roots: nodes, orderUpdates, treeSize: nextIndex, nodesByIndex }
-}
-
-export type OrderUpdate = {
-  id: string
-  order: number
+  return { roots: nodes, missingOrders, treeSize: nextIndex, nodesByIndex }
 }
 
 export type OrderedTreeNode<Datum> = {
@@ -70,7 +65,7 @@ type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
   parents: OrderedTreeNode<Datum>[]
 }
 
-function buildNodes<Datum>({
+function buildSiblingNodes<Datum>({
   data,
   siblingData,
   getId,
@@ -83,9 +78,9 @@ function buildNodes<Datum>({
   nodesByIndex,
   parents,
 }: BuildNodesArgs<Datum>) {
-  const orderUpdates: OrderUpdate[] = []
+  const missingOrders: Record<string, number> = {}
 
-  const { orderUpdates: newOrderUpdates, orderedData } = assignMissingOrder({
+  const { missingOrders: newmissingOrders, orderedData } = assignMissingOrder({
     siblingData,
     getId,
     compare,
@@ -93,7 +88,7 @@ function buildNodes<Datum>({
     setOrder,
   })
 
-  orderUpdates.push(...newOrderUpdates)
+  Object.assign(missingOrders, newmissingOrders)
 
   const nodes = orderedData.map(function buildNode(
     datum,
@@ -130,9 +125,10 @@ function buildNodes<Datum>({
     if (childData.length > 0 && !isCollapsed(datum)) {
       const {
         nodes: childNodes,
-        orderUpdates: moreOrderUpdates,
+        missingOrders: moremissingOrders,
         nextIndex: newNextIndex,
-      } = buildNodes({
+      } = buildSiblingNodes({
+        siblingData: childData,
         data,
         getParentId,
         getId,
@@ -140,7 +136,6 @@ function buildNodes<Datum>({
         getOrder,
         setOrder,
         isCollapsed,
-        siblingData: childData,
         nextIndex,
         nodesByIndex,
         parents: [node, ...parents],
@@ -150,7 +145,7 @@ function buildNodes<Datum>({
         node.children = childNodes
       }
 
-      orderUpdates.push(...moreOrderUpdates)
+      Object.assign(missingOrders, moremissingOrders)
       nextIndex = newNextIndex
     }
 
@@ -161,7 +156,7 @@ function buildNodes<Datum>({
 
   return {
     nodes,
-    orderUpdates,
+    missingOrders,
     nextIndex,
   }
 }
@@ -180,7 +175,7 @@ export function assignMissingOrder<Datum>({
   setOrder,
   compare,
 }: AssignMissingOrderArgs<Datum>) {
-  const orderUpdates: OrderUpdate[] = []
+  const missingOrders: Record<string, number> = {}
 
   function datumIsOrdered(datum: Datum) {
     return getOrder(datum) !== null
@@ -206,15 +201,12 @@ export function assignMissingOrder<Datum>({
   let nextOrder = orderGap
   for (const datum of unorderedData) {
     setOrder(datum, nextOrder)
-    orderUpdates.push({
-      id: getId(datum),
-      order: nextOrder,
-    })
+    missingOrders[getId(datum)] = nextOrder
     nextOrder += orderGap
   }
 
   return {
-    orderUpdates,
+    missingOrders,
     orderedData: [...unorderedData, ...orderedData],
   }
 }

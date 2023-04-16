@@ -74,7 +74,7 @@ export function OrderedTreeProvider<Datum>({
 
 export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
-  onOrderChange(id: string, newOrder: number, newParentId: string | null): void
+  moveNode(id: string, newOrder: number, newParentId: string | null): void
   dump?: DebugDataDumper
 }
 
@@ -103,7 +103,7 @@ export function useOrderedTree<Datum>({
 
   // Callbacks
   dump,
-  onOrderChange,
+  moveNode,
 }: UseOrderedTreeArgs<Datum>): UseOrderedTreeReturnType<Datum> {
   const datumFunctions = useMemo(
     () => ({
@@ -131,17 +131,20 @@ export function useOrderedTree<Datum>({
         nodesByIndex: tree.nodesByIndex,
         treeSize: tree.treeSize,
         roots: tree.roots,
+        fallbackOrders: tree.missingOrders,
         getParentId,
         getOrder,
         getId,
         dump,
-        onOrderChange,
+        moveNode,
+        collapseNode: () => {},
+        expandNode: () => {},
       })
   )
 
   useEffect(() => {
-    model.setOrderChangeCallback(onOrderChange)
-  }, [model, onOrderChange])
+    model.setMoveNode(moveNode)
+  }, [model, moveNode])
 
   const rootsWithDragNode = useChildNodes(tree.roots, null, model, false)
 

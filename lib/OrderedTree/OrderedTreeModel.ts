@@ -5,78 +5,28 @@ import { getDrag } from "./drag"
 import type { DebugDataDumper } from "~/Debug"
 import { assert } from "~/helpers"
 
-type DragStart<Datum> = {
-  node: OrderedTreeNode<Datum>
-  element: HTMLElement
-  clientX: number
-  clientY: number
-  treeBox: TreeBox
-  originalOrder: number
-  mouseMoveHandler(this: void, event: MouseEvent): void
-  mouseUpHandler(this: void): void
-}
-
-type TreeBox = {
-  top: number
-  height: number
-  offsetLeft: number
-  offsetTop: number
-}
-
-export type DragEnd = {
-  /**
-   * Number between 0 and 1 representing the node's position within its siblings
-   */
-  order: number
-  /**
-   * The new parentId that should be set for the drag child. Will be `string` or
-   * `null` if we're dragging into a new position within some nodes. Will be
-   * `undefined` when we haven't dragged anywhere, or if we dragged off of the
-   * tree. In these cases, we just leave the dragged row in the tree as if
-   * nothing happened.
-   */
-  parentId: string | null | undefined
-  /**
-   * The new depth of the node if we dropped it here
-   */
-  newDepth: number
-}
-
-export type PlaceholderListener = (
-  placeholderIsIncluded: boolean,
-  order: number | undefined
-) => void
-
 type OrderedTreeModelArgs<Datum> = {
-  // Tree properties:
-
+  // Tree properties
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   treeSize: number
   roots: OrderedTreeNode<Datum>[]
+  fallbackOrders: Record<string, number>
 
-  // Datum functions:
-
+  // Datum functions
   getParentId: DatumFunctions<Datum>["getParentId"]
   getOrder: DatumFunctions<Datum>["getOrder"]
   getId: DatumFunctions<Datum>["getId"]
 
-  // Other:
-
+  // Other
   dump?: DebugDataDumper
-  onOrderChange: (
+  moveNode: (
     nodeId: string,
     newOrder: number,
     newParentId: string | null
   ) => void
+  collapseNode(nodeId: string): void
+  expandNode(nodeId: string): void
 }
-
-const NoParent = Symbol("NoParent")
-
-type OrderChangeHandler = (
-  id: string,
-  newOrder: number,
-  newParentId: string | null
-) => void
 
 export class OrderedTreeModel<Datum> {
   clientX = NaN
@@ -85,35 +35,38 @@ export class OrderedTreeModel<Datum> {
   dragEnd?: DragEnd
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   getParentId: DatumFunctions<Datum>["getParentId"]
-  getOrder: DatumFunctions<Datum>["getOrder"]
+  getDatumOrder: DatumFunctions<Datum>["getOrder"]
   getId: DatumFunctions<Datum>["getId"]
   treeSize: number
   treeBox?: TreeBox
   roots: OrderedTreeNode<Datum>[]
+  fallbackOrders: Record<string, number>
   dump: DebugDataDumper
   dragChildListenersById: Partial<
     Record<string | typeof NoParent, PlaceholderListener>
   > = {}
-  onOrderChange: OrderChangeHandler
+  moveNode: MoveNodeHandler
 
   constructor({
     nodesByIndex,
     treeSize,
     roots,
+    fallbackOrders,
     getParentId,
     getOrder,
     getId,
     dump,
-    onOrderChange,
+    moveNode,
   }: OrderedTreeModelArgs<Datum>) {
     this.nodesByIndex = nodesByIndex
     this.treeSize = treeSize
     this.roots = roots
     this.getParentId = getParentId
-    this.getOrder = getOrder
+    this.getDatumOrder = getOrder
     this.getId = getId
     this.dump = dump ?? noop
-    this.onOrderChange = onOrderChange
+    this.moveNode = moveNode
+    this.fallbackOrders = fallbackOrders
   }
 
   cleanup() {
@@ -125,8 +78,8 @@ export class OrderedTreeModel<Datum> {
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
   }
 
-  setOrderChangeCallback(callback: OrderChangeHandler) {
-    this.onOrderChange = callback
+  setMoveNode(callback: MoveNodeHandler) {
+    this.moveNode = callback
   }
 
   setData(
@@ -183,6 +136,10 @@ export class OrderedTreeModel<Datum> {
     const dragNodeParentId = this.getParentId(this.dragStart.node.data)
 
     return node.id === dragNodeParentId
+  }
+
+  getOrder(datum: Datum) {
+    return this.getDatumOrder(datum) ?? this.fallbackOrders[this.getId(datum)]
   }
 
   getNewOrder() {
@@ -339,7 +296,7 @@ export class OrderedTreeModel<Datum> {
         direction: dragData.move,
         relativeToId: dragData.relativeTo.id,
         siblings,
-        getOrder: this.getOrder,
+        getOrder: this.getOrder.bind(this),
         getId: this.getId,
       })
 
@@ -447,7 +404,7 @@ export class OrderedTreeModel<Datum> {
 
     if (dragEnd.parentId !== undefined) {
       this.notifyNodeOfPlaceholderChange(dragEnd.parentId, false, undefined)
-      this.onOrderChange(dragStart.node.id, dragEnd.order, dragEnd.parentId)
+      this.moveNode(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
 
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
@@ -461,6 +418,56 @@ export class OrderedTreeModel<Datum> {
     }
   }
 }
+
+type DragStart<Datum> = {
+  node: OrderedTreeNode<Datum>
+  element: HTMLElement
+  clientX: number
+  clientY: number
+  treeBox: TreeBox
+  originalOrder: number
+  mouseMoveHandler(this: void, event: MouseEvent): void
+  mouseUpHandler(this: void): void
+}
+
+type TreeBox = {
+  top: number
+  height: number
+  offsetLeft: number
+  offsetTop: number
+}
+
+export type DragEnd = {
+  /**
+   * Number between 0 and 1 representing the node's position within its siblings
+   */
+  order: number
+  /**
+   * The new parentId that should be set for the drag child. Will be `string` or
+   * `null` if we're dragging into a new position within some nodes. Will be
+   * `undefined` when we haven't dragged anywhere, or if we dragged off of the
+   * tree. In these cases, we just leave the dragged row in the tree as if
+   * nothing happened.
+   */
+  parentId: string | null | undefined
+  /**
+   * The new depth of the node if we dropped it here
+   */
+  newDepth: number
+}
+
+export type PlaceholderListener = (
+  placeholderIsIncluded: boolean,
+  order: number | undefined
+) => void
+
+const NoParent = Symbol("NoParent")
+
+type MoveNodeHandler = (
+  id: string,
+  newOrder: number,
+  newParentId: string | null
+) => void
 
 /**
  * Returns a copy of the provided nodes array with an additional node spliced in
