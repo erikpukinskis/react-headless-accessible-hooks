@@ -3,16 +3,8 @@ import produce from "immer"
 import { startCase } from "lodash"
 import React, { useState } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import {
-  OrderedTreeProvider,
-  useOrderedTree,
-  useOrderedTreeNode,
-} from "./useOrderedTree"
-import type {
-  DatumFunctions,
-  UseOrderedTreeArgs,
-  OrderedTreeNode,
-} from "./useOrderedTree"
+import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
+import type { DatumFunctions, UseOrderedTreeArgs } from "./useOrderedTree"
 import { MockDOMLayout } from "~/testHelpers"
 
 describe("OrderedTree", () => {
@@ -557,7 +549,10 @@ describe("OrderedTree", () => {
 })
 
 /**
- * Minimal data type that can be rendered in the tree
+ * Minimal data type that can be rendered in the tree. This does not need to
+ * follow any specific structure, in fact you could use a number or a string as
+ * the data type. The useOrderedTree hook gets all of the information it needs
+ * about your data via the "Datum Functions" defined below...
  */
 type Kin = {
   id: string
@@ -586,24 +581,10 @@ function buildKin({ id, name, ...overrides }: KinOverrides) {
 }
 
 /**
- * Functions needed by `useOrderedTree` to treat this data type as tree nodes
- */
-const DATUM_FUNCTIONS: DatumFunctions<Kin> = {
-  getId: (kin) => kin.id,
-  compare(a, b) {
-    return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0
-  },
-  getParentId: (kin) => kin.parentId,
-  getOrder: (kin) => kin.order,
-  setOrder: (kin, order) => (kin.order = order),
-  isCollapsed: (kin) => kin.isCollapsed,
-}
-
-/**
  * Render the test Tree component and return some of the elements
  */
-function renderTree(props: TreeProps) {
-  const result = render(<Tree {...props} />)
+function renderTree(props: KinTreeProps) {
+  const result = render(<KinTree {...props} />)
 
   const rows = result.queryAllByRole("treeitem")
   const tree = result.getByRole("tree")
@@ -611,17 +592,39 @@ function renderTree(props: TreeProps) {
   return { rows, tree, dump: () => console.log(result.debug()) }
 }
 
-type TreeProps = Partial<UseOrderedTreeArgs<Kin>> & {
+/**
+ * Functions to get necessary information about items in the `data` array you
+ * pass to `useOrderedTree`
+ */
+const DATUM_FUNCTIONS: DatumFunctions<Kin> = {
+  /* Unique id to be used to index your data */
+  getId: (kin) => kin.id,
+  /* Parent id of a given datum, or `null` if it is a root node */
+  getParentId: (kin) => kin.parentId,
+  /* Number representing the order of a datum within its siblings */
+  getOrder: (kin) => kin.order,
+  /* If no manual order has been set, backup function to sort unsorted data */
+  compare: (a: Kin, b: Kin) => {
+    return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
+  },
+  /* Return true if the node should be collapsed (hiding its children) */
+  isCollapsed: (kin) => kin.isCollapsed,
+}
+
+type KinTreeProps = Partial<UseOrderedTreeArgs<Kin>> & {
   data: Kin[]
 }
 
 /**
- * Test tree component
+ * Example component which renders an orderable tree of family members.
+ *
+ * This component sets up the `useOrderedTree` hook, its callbacks, and then
+ * renders out the root nodes (where the parent id is `null`).
  */
-function Tree({ data: initialData, moveNode, ...overrides }: TreeProps) {
+function KinTree({ data: initialData, moveNode, ...overrides }: KinTreeProps) {
   const [data, setData] = useState(initialData)
 
-  function handleOrderChange(
+  function moveNodeAndSave(
     id: string,
     newOrder: number,
     newParentId: string | null
@@ -639,70 +642,76 @@ function Tree({ data: initialData, moveNode, ...overrides }: TreeProps) {
     moveNode?.(id, newOrder, newParentId)
   }
 
-  const { roots, getTreeProps, model } = useOrderedTree({
-    moveNode: handleOrderChange,
+  const { roots, getTreeProps, TreeProvider, getKey } = useOrderedTree({
+    moveNode: moveNodeAndSave,
     data,
     ...DATUM_FUNCTIONS,
     ...overrides,
   })
 
   return (
-    <OrderedTreeProvider model={model}>
-      <div {...getTreeProps()}>
+    <div {...getTreeProps()}>
+      <TreeProvider>
         {roots.map((node) => (
-          <TreeNode key={log(node.key, "root")} node={node} />
+          <KinNode key={getKey(node)} kin={node} />
         ))}
-      </div>
-    </OrderedTreeProvider>
+      </TreeProvider>
+    </div>
   )
 }
 
-type TreeNodesProps = {
-  node: OrderedTreeNode<Kin>
+type KinNodeProps = {
+  kin: Kin
 }
 
 /**
- * Renders simple ordered table rows, with a simple depth indicator made of
- * dashes and angle brackets. The contents of each row will be a single cell
- * like:
+ * Renders a single tree node with its children, with a simple depth indicator
+ * made of dashes and angle brackets.
+ *
+ * The contents of each row will be a single cell like
  *
  *     - Gramps
  *     -> Auntie
  *     -> Momma
  *     ->> Grandkid
+ *
+ * but in a real-world example these divs would likely be styled with disclosure
+ * icons, etc.
+ *
+ * This component also demonstrates how to use the `useOrderedTreeNode` hook,
+ * which is the way to get the tree state relating to a specific node.
  */
-function TreeNode({ node }: TreeNodesProps) {
-  const { childNodes, getParentProps, depth, childIsBeingDragged } =
-    useOrderedTreeNode(node)
-
-  const isExpanded =
-    childNodes.length > 1 || (childNodes.length === 1 && !childIsBeingDragged)
+function KinNode({ kin }: KinNodeProps) {
+  const {
+    children,
+    getNodeProps,
+    depth,
+    isPlaceholder,
+    key,
+    isExpanded,
+    isCollapsed,
+  } = useOrderedTreeNode(kin)
 
   const prefix = `${[...(Array(depth) as unknown[])].map(() => "-").join("")}${
-    node.isCollapsed ? ">" : isExpanded ? "v" : "-"
+    isCollapsed ? ">" : isExpanded ? "v" : "-"
   }`
 
-  if (node.isPlaceholder) {
+  if (isPlaceholder) {
     return (
       <div>
-        {prefix} Placeholder for {node.data.name};
+        {prefix} Placeholder for {kin.name};
       </div>
     )
   }
 
   return (
     <>
-      <div {...getParentProps()}>
-        {prefix} {node.data.name};
+      <div {...getNodeProps()}>
+        {prefix} {kin.name};
       </div>
-      {childNodes.map((child) => (
-        <TreeNode key={log(child.key, "child")} node={child} />
+      {children.map((child) => (
+        <KinNode key={key} kin={child} />
       ))}
     </>
   )
-}
-
-function log<T>(thing: T, label: string) {
-  console.log(label, String(thing))
-  return thing
 }

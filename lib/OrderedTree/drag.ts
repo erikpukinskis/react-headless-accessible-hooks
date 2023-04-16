@@ -4,18 +4,18 @@ const MAX_LOOP = 10
 
 type Direction = "up" | "down" | "nowhere"
 
-export type DragData = {
+export type DragData<Datum> = {
   dragging: boolean
   dx: number | undefined
-  downNode?: OrderedTreeNode<unknown>
+  downNode?: OrderedTreeNode<Datum>
   dragDirection: Direction
   downDepth?: number
   hoverDepth?: number
   targetDepth?: number
   roundedTargetDepth?: number
-  relativeTo?: OrderedTreeNode<unknown>
+  relativeTo?: OrderedTreeNode<Datum>
   move: "before" | "after" | "nowhere" | "first-child"
-  hoverNode?: OrderedTreeNode<unknown>
+  hoverNode?: OrderedTreeNode<Datum>
 }
 
 export function getDrag<Datum>(
@@ -24,7 +24,7 @@ export function getDrag<Datum>(
   hoverIndex: number,
   dx: number | undefined,
   dy: number | undefined
-): DragData {
+): DragData<Datum> {
   if (dx === 0 && dy === 0) {
     return {
       dragging: false,
@@ -36,7 +36,7 @@ export function getDrag<Datum>(
 
   const dragging = hoverIndex != null && downRowIndex != null
 
-  const data: DragData = {
+  const data: DragData<Datum> = {
     dragging,
     dragDirection: "nowhere",
     move: "nowhere",
@@ -157,9 +157,9 @@ export function getDrag<Datum>(
   }
 }
 
-function getAncestorClosestToDepth(
+function getAncestorClosestToDepth<Datum>(
   targetDepth: number,
-  node: OrderedTreeNode<unknown>
+  node: OrderedTreeNode<Datum>
 ) {
   const ancestors = getAncestorChain(node, targetDepth)
 
@@ -208,8 +208,8 @@ function getAncestorClosestToDepth(
  * If the targetDepth is 1 then `getAncestorChain` will return an array in the
  * opposite order starting at the target depth: ["grandma", "mom", "node"]
  */
-export function getAncestorChain(
-  node: OrderedTreeNode<unknown>,
+export function getAncestorChain<Datum>(
+  node: OrderedTreeNode<Datum>,
   targetDepth: number
 ) {
   const nodeDepth = node.parents.length

@@ -1,4 +1,3 @@
-import { map } from "lodash"
 import {
   createContext,
   useCallback,
@@ -12,9 +11,9 @@ import { buildTree } from "./buildTree"
 import type { PlaceholderListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
-import { makeUninitializedContext } from "~/helpers"
+import { makeUninitializedContext, assert } from "~/helpers"
 
-export type { OrderedTreeNode, DatumFunctions } from "./buildTree"
+export type { DatumFunctions } from "./buildTree"
 
 // moving down...
 //  - if hoverNeed has (expanded) children, insert before first child of hoverNeed
@@ -48,21 +47,12 @@ type OrderedTreeProviderProps<Datum> = {
   model: OrderedTreeModel<Datum>
 }
 
-export function OrderedTreeProvider<Datum>({
+function OrderedTreeProvider<Datum>({
   children,
   model,
 }: OrderedTreeProviderProps<Datum>) {
   if (!model) {
-    throw new Error(
-      `OrderedTreeProvider must get a model from useOrderedTree. Try:
-
-        const { model } = useOrderedTree(...)
-
-        <OrderedTreeProvider model={model}>
-          ...
-        </OrderedTreeProvider>
-`
-    )
+    throw new Error("OrderedTreeProvider needs a model")
   }
 
   return (
@@ -82,12 +72,13 @@ type GetTreeProps = () => React.HTMLAttributes<HTMLElement> & {
   ref(node: HTMLElement | null): void
 }
 
-export type GetNodeProps = () => React.HTMLAttributes<HTMLElement>
+type GetNodeProps = () => React.HTMLAttributes<HTMLElement>
 
 type UseOrderedTreeReturnType<Datum> = {
-  roots: OrderedTreeNode<Datum>[]
+  roots: Datum[]
   getTreeProps: GetTreeProps
-  model: OrderedTreeModel<Datum>
+  TreeProvider(this: void, props: { children: React.ReactNode }): JSX.Element
+  getKey(this: void, datum: Datum): string
 }
 
 export function useOrderedTree<Datum>({
@@ -96,9 +87,8 @@ export function useOrderedTree<Datum>({
   // Datum functions
   getParentId,
   getId,
-  compare,
   getOrder,
-  setOrder,
+  compare,
   isCollapsed,
 
   // Callbacks
@@ -109,9 +99,8 @@ export function useOrderedTree<Datum>({
     () => ({
       getParentId,
       getId,
-      compare,
       getOrder,
-      setOrder,
+      compare,
       isCollapsed,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,10 +117,7 @@ export function useOrderedTree<Datum>({
   const [model] = useState(
     () =>
       new OrderedTreeModel({
-        nodesByIndex: tree.nodesByIndex,
-        treeSize: tree.treeSize,
-        roots: tree.roots,
-        fallbackOrders: tree.missingOrders,
+        tree: tree,
         getParentId,
         getOrder,
         getId,
@@ -146,7 +132,7 @@ export function useOrderedTree<Datum>({
     model.setMoveNode(moveNode)
   }, [model, moveNode])
 
-  const rootsWithDragNode = useChildNodes(tree.roots, null, model, false)
+  const rootsWithPlaceholder = useChildData(tree.roots, null, model, false)
 
   useEffect(() => {
     const newTree = buildTree({
@@ -155,12 +141,8 @@ export function useOrderedTree<Datum>({
     })
 
     setTree(newTree)
-    model.setData(newTree.nodesByIndex, newTree.treeSize, newTree.roots)
+    model.setTree(newTree)
   }, [data, model, datumFunctions])
-
-  useEffect(() => {
-    model.nodesByIndex = tree.nodesByIndex
-  }, [model, tree.nodesByIndex])
 
   function getTreeProps() {
     return {
@@ -188,56 +170,82 @@ export function useOrderedTree<Datum>({
     }
   }
 
+  function TreeProvider(
+    this: void,
+    { children }: { children: React.ReactNode }
+  ) {
+    return <OrderedTreeProvider model={model}>{children}</OrderedTreeProvider>
+  }
+
+  function getKey(datum: Datum) {
+    return model.getKey(datum)
+  }
+
   return {
-    roots: rootsWithDragNode,
+    roots: rootsWithPlaceholder,
     getTreeProps,
-    model,
+    TreeProvider,
+    getKey,
   }
 }
 
-export function useOrderedTreeNode<Datum>(node: OrderedTreeNode<Datum>) {
+type UseOrderedTreeNodeReturnType<Datum> = {
+  children: Datum[]
+  getNodeProps: GetNodeProps
+  depth: number
+  isBeingDragged: boolean
+  hasChildren: boolean
+  isExpanded: boolean
+  isCollapsed: boolean
+  isPlaceholder: boolean
+  key: string
+}
+
+export function useOrderedTreeNode<Datum>(
+  datum: Datum
+): UseOrderedTreeNodeReturnType<Datum> {
   const model = useModel<Datum>()
+  const node = model.getNode(datum)
+  const isPlaceholder = model.isPlaceholder(datum)
+  const children = useChildData(node.children, node.id, model, isPlaceholder)
+  const key = model.getKey(datum)
 
-  const childNodes = useChildNodes(
-    node.children,
-    node.id,
-    model,
-    node.isPlaceholder
-  )
-
-  const getParentProps = useCallback<GetNodeProps>(() => {
-    const key = node.isPlaceholder ? `${node.id}-placeholder` : node.id
-
+  const getNodeProps = useCallback<GetNodeProps>(() => {
     return {
-      onMouseDown: model.handleMouseDown.bind(model, node),
+      onMouseDown: model.handleMouseDown.bind(model, datum),
       key,
       role: "treeitem",
     }
-  }, [node, model])
+  }, [model, key, datum])
 
-  const depth = node.isPlaceholder
+  const depth = isPlaceholder
     ? model.getPlaceholderDepth()
     : node.parents.length
 
-  const isBeingDragged = model.isBeingDragged(node)
+  const childIsBeingDragged = model.childIsBeingDragged(node.id)
 
-  const childIsBeingDragged = model.childIsBeingDragged(node)
+  const hasChildren =
+    children.length > 1 || (children.length === 1 && !childIsBeingDragged)
 
   return {
-    childNodes,
-    getParentProps,
+    key,
+    children,
+    getNodeProps,
     depth,
-    isBeingDragged,
-    childIsBeingDragged,
+    isBeingDragged: model.isBeingDragged(node.id),
+    isExpanded: model.isExpanded(node.id),
+    isCollapsed: model.isCollapsed(node.id),
+    isPlaceholder: model.isPlaceholder(datum),
+    hasChildren,
   }
 }
 
-function useChildNodes<Datum>(
-  nodes: OrderedTreeNode<Datum>[],
+function useChildData<Datum>(
+  children: OrderedTreeNode<Datum>[],
   parentId: string | null,
   model: OrderedTreeModel<Datum>,
   isPlaceholder: boolean
-) {
+): Datum[] {
   const [placeholderIsIncluded, setPlaceholderIncluded] = useState(false)
   const [placeholderOrder, setPlaceholderOrder] = useState<number | undefined>(
     undefined
@@ -261,47 +269,54 @@ function useChildNodes<Datum>(
     }
   }, [model, parentId, isPlaceholder])
 
-  const childNodes = useMemo(
-    function buildChildNodes() {
+  return useMemo(
+    function buildChildNodes(): Datum[] {
       if (isPlaceholder) return []
 
       if (!model.dragStart) {
-        assertUniqueKeys(nodes)
-        return nodes
+        return children.map((node) => node.data)
       }
 
-      const nodesWithPlaceholder = placeholderIsIncluded
-        ? model.getNodesWithPlaceholder(nodes)
-        : nodes
+      if (!placeholderIsIncluded) {
+        return children.map((node) => node.data)
+      }
 
-      /// Wait, shouldn't we be passing a fresh placeholderOrder here? Is this not causing a problem?
-      const nodesWithDraggedNodeMarked = nodesWithPlaceholder.map((node) => {
-        if (model.isBeingDragged(node)) {
-          return {
-            ...node,
-            isBeingDragged: true,
-          }
-        } else {
-          return node
-        }
-      })
-
-      assertUniqueKeys(nodesWithDraggedNodeMarked)
-
-      return nodesWithDraggedNodeMarked
+      return splicePlaceholder(
+        children,
+        assert(
+          model.getPlaceholderData(),
+          "Could not get placeholder id, even though placeholder is included in these siblings"
+        ),
+        assert(
+          placeholderOrder,
+          "Do not have placeholder order, even though placeholder is included in these siblings"
+        )
+      )
     },
-    [model, nodes, placeholderIsIncluded, placeholderOrder, isPlaceholder]
+    [model, children, placeholderIsIncluded, placeholderOrder, isPlaceholder]
   )
-
-  return childNodes
 }
 
-function assertUniqueKeys(nodes: OrderedTreeNode<unknown>[]) {
-  const sorted = map(nodes, "key").sort()
-
-  for (let i = 0; i < sorted.length - 1; i++) {
-    if (sorted[i + 1] === sorted[i]) {
-      throw new Error(`Duplicate key: ${sorted[i]}`)
-    }
+/**
+ * Returns a copy of the provided nodes array with an additional node spliced in
+ * based on the provided order
+ */
+function splicePlaceholder<Datum>(
+  siblings: OrderedTreeNode<Datum>[],
+  placeholderDatum: Datum,
+  placeholderOrder: number
+) {
+  let spliceIndex = 0
+  while (
+    spliceIndex < siblings.length &&
+    siblings[spliceIndex].order < placeholderOrder
+  ) {
+    spliceIndex++
   }
+
+  const data = siblings.map((node) => node.data)
+
+  data.splice(spliceIndex, 0, placeholderDatum)
+
+  return data
 }

@@ -36,6 +36,7 @@
     "check:format": "prettier --check --ignore-path .gitignore .",
     "check:lint": "eslint --ignore-path .gitignore --no-error-on-unmatched-pattern .; if [ $? -eq 0 ]; then echo 8J+OiSBObyBsaW50IGluIHRoaXMgY29kZSEKCg== | base64 -d; else exit 1; fi",
     "check:types": "tsc --noEmit -p tsconfig.json; if [ $? -eq 0 ]; then echo 8J+OiSBUeXBlcyBhcmUgZ29vZCEKCg== | base64 -d; else exit 1; fi",
+    "watch:problems": "tsc --watch --noEmit -p tsconfig.json",
     "confgen": "npx confgen@latest @lib @docs git vite react typescript prettier eslint vitest codedocs yarn codespaces",
     "fix": "yarn fix:lint && yarn fix:format",
     "fix:format": "prettier --write --ignore-path .gitignore .",

@@ -1,12 +1,7 @@
 import { styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
 import React, { useState } from "react"
-import type { OrderedTreeNode } from "./useOrderedTree"
-import {
-  useOrderedTree,
-  useOrderedTreeNode,
-  OrderedTreeProvider,
-} from "./useOrderedTree"
+import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import { useDumpDebugData } from "~/Debug"
 
 export default (
@@ -119,7 +114,7 @@ function Template({ data: initialData }: TemplateProps) {
 
   const dump = useDumpDebugData()
 
-  const { roots, getTreeProps, model } = useOrderedTree({
+  const { roots, getTreeProps, TreeProvider, getKey } = useOrderedTree({
     data,
     moveNode(id, newOrder, newParentId) {
       const index = data.findIndex((datum) => datum.id === id)
@@ -141,23 +136,22 @@ function Template({ data: initialData }: TemplateProps) {
       setData(newArray)
     },
     getId: (kin) => kin.id,
-    compare(a, b) {
-      return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0
-    },
     getParentId: (kin) => kin.parentId,
     getOrder: (kin) => kin.order,
-    setOrder: (kin, order) => (kin.order = order),
+    compare: (a: Kin, b: Kin) => {
+      return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
+    },
     isCollapsed: (kin) => kin.isCollapsed,
     dump,
   })
 
   return (
     <Tree {...getTreeProps()}>
-      <OrderedTreeProvider model={model}>
+      <TreeProvider>
         {roots.map((node) => (
-          <TreeRows key={node.key} node={node} />
+          <TreeRows key={getKey(node)} kin={node} />
         ))}
-      </OrderedTreeProvider>
+      </TreeProvider>
     </Tree>
   )
 }
@@ -204,52 +198,52 @@ const PlaceholderShadow = styled("div", {
 })
 
 type TreeRowsProps = {
-  node: OrderedTreeNode<Kin>
+  kin: Kin
 }
 
-const TreeRows = ({ node }: TreeRowsProps) => {
+const TreeRows = ({ kin }: TreeRowsProps) => {
   const {
-    childNodes,
-    getParentProps,
+    children,
+    getNodeProps,
     depth,
+    isPlaceholder,
     isBeingDragged,
-    childIsBeingDragged,
-  } = useOrderedTreeNode(node)
+    hasChildren,
+    isCollapsed,
+    key,
+  } = useOrderedTreeNode(kin)
 
-  if (node.isPlaceholder) {
+  if (isPlaceholder) {
     return (
       <Placeholder>
         <DepthIndicator
-          id={node.id}
+          id={kin.id}
           depth={depth}
           isCollapsed={false}
           hasChildren={false}
         />
-        <PlaceholderShadow>{node.data.name}</PlaceholderShadow>
+        <PlaceholderShadow>{kin.name}</PlaceholderShadow>
       </Placeholder>
     )
   }
 
-  const hasChildren =
-    childNodes.length > 1 || (childNodes.length === 1 && !childIsBeingDragged)
-
   return (
     <>
-      <DraggableRow {...getParentProps()} isBeingDragged={isBeingDragged}>
+      <DraggableRow {...getNodeProps()} isBeingDragged={isBeingDragged}>
         {isBeingDragged || (
           <DepthIndicator
-            id={node.id}
+            id={kin.id}
             depth={depth}
-            isCollapsed={node.data.isCollapsed}
+            isCollapsed={isCollapsed}
             hasChildren={hasChildren}
           />
         )}
         <span style={hasChildren ? { fontWeight: 500 } : undefined}>
-          {node.data.name}
+          {kin.name}
         </span>
       </DraggableRow>
-      {childNodes.map((child) => (
-        <TreeRows key={child.key} node={child} />
+      {children.map((child) => (
+        <TreeRows key={key} kin={child} />
       ))}
     </>
   )

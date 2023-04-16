@@ -49,13 +49,12 @@ const DATA: Kin[] = [
 
 const FUNCTIONS: DatumFunctions<Kin> = {
   getId: (kin) => kin.id,
-  compare(a, b) {
-    return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0
-  },
   getParentId: (kin) => kin.parentId,
   getOrder: (kin) => kin.order,
-  setOrder: (kin, order) => (kin.order = order),
   isCollapsed: (kin) => kin.isCollapsed,
+  compare: (a, b) => {
+    return new Date(b.createdAt).valueOf() - new Date(a.createdAt).valueOf()
+  },
 }
 
 describe("buildTree", () => {
@@ -69,7 +68,7 @@ describe("buildTree", () => {
    */
   const [gramps, auntie, momma, grandkid] = DATA
 
-  it("should list parents", async () => {
+  it("should list parents", () => {
     const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
 
     expect(roots[0].data.name).toBe("gramps")
@@ -93,7 +92,7 @@ describe("buildTree", () => {
     expect(auntieBranch.parents[0].data.name).toBe("gramps")
   })
 
-  it("should mark last siblings", async () => {
+  it("should mark last siblings", () => {
     const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
 
     expect(roots[0].data.name).toBe("gramps")
@@ -162,9 +161,12 @@ describe("buildTree", () => {
   })
 
   it("should provide updates for all needs", () => {
-    const { missingOrders } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
+    const { missingOrdersById } = buildTree({
+      data: cloneDeep(DATA),
+      ...FUNCTIONS,
+    })
 
-    const updates = Object.entries(missingOrders).reduce(
+    const updates = Object.entries(missingOrdersById).reduce(
       (updates, [id, order]) => ({
         ...updates,
         [id]: order,
@@ -179,34 +181,44 @@ describe("buildTree", () => {
   })
 
   it("should set a smaller order when we move an item before another", () => {
-    const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
+    const { roots, missingOrdersById } = buildTree({
+      data: cloneDeep(DATA),
+      ...FUNCTIONS,
+    })
 
     expect(
       placeWithinSiblings({
         direction: "before",
         relativeToId: gramps.id,
         siblings: roots,
+        missingOrdersById,
         ...FUNCTIONS,
       })
     ).toBeCloseTo(0.25)
+
     expect(
       placeWithinSiblings({
         direction: "before",
         relativeToId: momma.id,
         siblings: roots[0].children,
+        missingOrdersById,
         ...FUNCTIONS,
       })
     ).toBeCloseTo(0.16666)
   })
 
   it("should set a larger order when we move an item after another", () => {
-    const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
+    const { roots, missingOrdersById } = buildTree({
+      data: cloneDeep(DATA),
+      ...FUNCTIONS,
+    })
 
     expect(
       placeWithinSiblings({
         direction: "after",
         relativeToId: gramps.id,
         siblings: roots,
+        missingOrdersById,
         ...FUNCTIONS,
       })
     ).toBeCloseTo(0.75)
@@ -215,19 +227,24 @@ describe("buildTree", () => {
         direction: "after",
         relativeToId: auntie.id,
         siblings: roots[0].children,
+        missingOrdersById,
         ...FUNCTIONS,
       })
     ).toBeCloseTo(0.8333)
   })
 
   it("should set an order between two items", () => {
-    const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
+    const { roots, missingOrdersById } = buildTree({
+      data: cloneDeep(DATA),
+      ...FUNCTIONS,
+    })
 
     expect(
       placeWithinSiblings({
         direction: "after",
         relativeToId: momma.id,
         siblings: roots[0].children,
+        missingOrdersById,
         ...FUNCTIONS,
       })
     ).toBeCloseTo(0.5)
@@ -236,6 +253,7 @@ describe("buildTree", () => {
         direction: "before",
         relativeToId: auntie.id,
         siblings: roots[0].children,
+        missingOrdersById,
         ...FUNCTIONS,
       })
     ).toBeCloseTo(0.5)

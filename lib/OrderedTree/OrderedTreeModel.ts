@@ -1,16 +1,16 @@
 import { get, isEqual, noop } from "lodash"
-import type { DatumFunctions, OrderedTreeNode } from "./buildTree"
+import type {
+  DatumFunctions,
+  OrderedTreeBuild,
+  OrderedTreeNode,
+} from "./buildTree"
 import { placeWithinSiblings } from "./buildTree"
 import { getDrag } from "./drag"
 import type { DebugDataDumper } from "~/Debug"
 import { assert } from "~/helpers"
 
 type OrderedTreeModelArgs<Datum> = {
-  // Tree properties
-  nodesByIndex: Record<number, OrderedTreeNode<Datum>>
-  treeSize: number
-  roots: OrderedTreeNode<Datum>[]
-  fallbackOrders: Record<string, number>
+  tree: OrderedTreeBuild<Datum>
 
   // Datum functions
   getParentId: DatumFunctions<Datum>["getParentId"]
@@ -33,14 +33,11 @@ export class OrderedTreeModel<Datum> {
   clientY = NaN
   dragStart?: DragStart<Datum>
   dragEnd?: DragEnd
-  nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   getParentId: DatumFunctions<Datum>["getParentId"]
   getDatumOrder: DatumFunctions<Datum>["getOrder"]
   getId: DatumFunctions<Datum>["getId"]
-  treeSize: number
+  tree: OrderedTreeBuild<Datum>
   treeBox?: TreeBox
-  roots: OrderedTreeNode<Datum>[]
-  fallbackOrders: Record<string, number>
   dump: DebugDataDumper
   dragChildListenersById: Partial<
     Record<string | typeof NoParent, PlaceholderListener>
@@ -48,25 +45,19 @@ export class OrderedTreeModel<Datum> {
   moveNode: MoveNodeHandler
 
   constructor({
-    nodesByIndex,
-    treeSize,
-    roots,
-    fallbackOrders,
+    tree,
     getParentId,
     getOrder,
     getId,
     dump,
     moveNode,
   }: OrderedTreeModelArgs<Datum>) {
-    this.nodesByIndex = nodesByIndex
-    this.treeSize = treeSize
-    this.roots = roots
+    this.tree = tree
     this.getParentId = getParentId
     this.getDatumOrder = getOrder
     this.getId = getId
     this.dump = dump ?? noop
     this.moveNode = moveNode
-    this.fallbackOrders = fallbackOrders
   }
 
   cleanup() {
@@ -82,64 +73,23 @@ export class OrderedTreeModel<Datum> {
     this.moveNode = callback
   }
 
-  setData(
-    nodesByIndex: Record<number, OrderedTreeNode<Datum>>,
-    treeSize: number,
-    roots: OrderedTreeNode<Datum>[]
-  ) {
-    this.nodesByIndex = nodesByIndex
-    this.treeSize = treeSize
-    this.roots = roots
+  setTree(tree: OrderedTreeBuild<Datum>) {
+    this.tree = tree
   }
 
   setTreeBox(box: TreeBox | undefined) {
     this.treeBox = box
   }
 
-  /**
-   * Splices a placeholder into the provided node array at the correct position
-   */
-  getNodesWithPlaceholder(nodes: OrderedTreeNode<Datum>[]) {
-    const dragNode = this.dragStart?.node
-
-    if (!dragNode) {
-      throw new Error(
-        "Expected to splice a placeholder into some nodes, but the drag doesn't appear to have started"
-      )
-    }
-
-    const { dragEnd } = this
-
-    if (!dragEnd) {
-      throw new Error(
-        "Expected to splice a placeholder into some nodes, but there was no mousemove yet"
-      )
-    }
-
-    const nodesWithPlaceholder = splicePlaceholder(
-      nodes,
-      dragNode,
-      dragEnd.order
-    )
-
-    return nodesWithPlaceholder
-  }
-
-  isBeingDragged(node: OrderedTreeNode<Datum>) {
-    if (!this.dragStart) return false
-    return this.dragStart.node.id === node.id
-  }
-
-  childIsBeingDragged(node: OrderedTreeNode<Datum>) {
-    if (!this.dragStart) return false
-
-    const dragNodeParentId = this.getParentId(this.dragStart.node.data)
-
-    return node.id === dragNodeParentId
+  getNode(datum: Datum) {
+    return this.tree.nodesById[this.getId(datum)]
   }
 
   getOrder(datum: Datum) {
-    return this.getDatumOrder(datum) ?? this.fallbackOrders[this.getId(datum)]
+    return (
+      this.getDatumOrder(datum) ??
+      this.tree.missingOrdersById[this.getId(datum)]
+    )
   }
 
   getNewOrder() {
@@ -156,6 +106,59 @@ export class OrderedTreeModel<Datum> {
     return this.dragEnd.newDepth
   }
 
+  getPlaceholderData(): Datum {
+    if (!this.dragStart) {
+      throw new Error("Can not get placeholder data when not dragging")
+    }
+
+    return this.dragStart.placeholderDatum
+  }
+
+  getPlaceholderOrder(): number {
+    if (!this.dragEnd) {
+      throw new Error("Can not get placeholder order when not dragging")
+    }
+
+    return this.dragEnd.order
+  }
+
+  getKey(datum: Datum) {
+    const id = this.getId(datum)
+
+    if (datum === this.dragStart?.placeholderDatum) {
+      return `placeholder-node-${id}`
+    } else {
+      return `ordered-node-${id}`
+    }
+  }
+
+  isExpanded(id: string): boolean {
+    const node = this.tree.nodesById[id]
+    return node.children.length > 0
+  }
+
+  isCollapsed(id: string): boolean {
+    const node = this.tree.nodesById[id]
+    return node.isCollapsed
+  }
+
+  isPlaceholder(datum: Datum): boolean {
+    return datum === this.dragStart?.placeholderDatum
+  }
+
+  isBeingDragged(id: string) {
+    if (!this.dragStart) return false
+    return this.dragStart.node.id === id
+  }
+
+  childIsBeingDragged(parentId: string) {
+    if (!this.dragStart) return false
+
+    const dragNodeParentId = this.getParentId(this.dragStart.node.data)
+
+    return parentId === dragNodeParentId
+  }
+
   /**
    * Updates CSS positioning styles on the element being dragged
    */
@@ -164,7 +167,7 @@ export class OrderedTreeModel<Datum> {
 
     const dx = this.clientX - this.dragStart.clientX
     const dy = this.clientY - this.dragStart.clientY
-    const rowHeight = this.dragStart.treeBox.height / this.treeSize
+    const rowHeight = this.dragStart.treeBox.height / this.tree.treeSize
     const rowTop =
       this.dragStart.treeBox.offsetTop + this.dragStart.node.index * rowHeight
 
@@ -246,7 +249,7 @@ export class OrderedTreeModel<Datum> {
 
     this.updateDragElementPosition()
 
-    const rowHeight = this.dragStart.treeBox.height / this.treeSize
+    const rowHeight = this.dragStart.treeBox.height / this.tree.treeSize
     const treeY = this.clientY - this.dragStart.treeBox.top
     this.dump("treeY", treeY)
     const hoverIndex = Math.floor(treeY / rowHeight)
@@ -254,7 +257,7 @@ export class OrderedTreeModel<Datum> {
     const dy = this.clientY - this.dragStart.clientY
 
     const dragData = getDrag(
-      this.nodesByIndex,
+      this.tree.nodesByIndex,
       this.dragStart.node.index,
       hoverIndex,
       dx,
@@ -263,7 +266,11 @@ export class OrderedTreeModel<Datum> {
 
     const { relativeTo } = dragData
 
-    this.dump("move", dragData.move, relativeTo && get(relativeTo, "data.name"))
+    this.dump(
+      "move",
+      dragData.move,
+      relativeTo ? (get(relativeTo, "data.name") as string) : undefined
+    )
 
     this.dump("target depth", dragData.roundedTargetDepth)
 
@@ -290,12 +297,13 @@ export class OrderedTreeModel<Datum> {
       newDepth = dragData.relativeTo.parents.length + 1
     } else {
       const newParent = dragData.relativeTo.parents[0]
-      const siblings = newParent ? newParent.children : this.roots
+      const siblings = newParent ? newParent.children : this.tree.roots
 
       newOrder = placeWithinSiblings({
         direction: dragData.move,
         relativeToId: dragData.relativeTo.id,
         siblings,
+        missingOrdersById: this.tree.missingOrdersById,
         getOrder: this.getOrder.bind(this),
         getId: this.getId,
       })
@@ -349,7 +357,7 @@ export class OrderedTreeModel<Datum> {
     }
   }
 
-  handleMouseDown(node: OrderedTreeNode<Datum>, event: React.MouseEvent) {
+  handleMouseDown(datum: Datum, event: React.MouseEvent) {
     if (!this.treeBox) return
 
     const mouseMoveHandler = this.handleMouseMove.bind(this)
@@ -372,8 +380,11 @@ export class OrderedTreeModel<Datum> {
     element.style.height = `${rect.height}px`
     element.style.boxSizing = "border-box"
 
+    const node = this.tree.nodesById[this.getId(datum)]
+
     this.dragStart = {
       node,
+      placeholderDatum: { ...datum, __isRhahPlaceholder: true },
       element,
       clientX: this.clientX,
       clientY: this.clientY,
@@ -421,6 +432,7 @@ export class OrderedTreeModel<Datum> {
 
 type DragStart<Datum> = {
   node: OrderedTreeNode<Datum>
+  placeholderDatum: Datum
   element: HTMLElement
   clientX: number
   clientY: number
@@ -468,31 +480,6 @@ type MoveNodeHandler = (
   newOrder: number,
   newParentId: string | null
 ) => void
-
-/**
- * Returns a copy of the provided nodes array with an additional node spliced in
- * based on the provided order
- */
-function splicePlaceholder<Datum>(
-  nodes: OrderedTreeNode<Datum>[],
-  nodeToInsert: OrderedTreeNode<Datum>,
-  order: number
-) {
-  let spliceIndex = 0
-  while (spliceIndex < nodes.length && nodes[spliceIndex].order < order) {
-    spliceIndex++
-  }
-
-  const copy = [...nodes]
-  copy.splice(spliceIndex, 0, {
-    ...nodeToInsert,
-    order,
-    isPlaceholder: true,
-    key: `${nodeToInsert.id}-placeholder`,
-  })
-
-  return copy
-}
 
 /**
  * This function returns `true` if an `order` is dangerously close to `0` or `1`

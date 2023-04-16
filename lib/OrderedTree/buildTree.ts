@@ -4,10 +4,19 @@ import { assert } from "~/helpers"
 export type DatumFunctions<Datum> = {
   getParentId(datum: Datum): string | null
   getId(datum: Datum): string
-  compare(a: Datum, b: Datum): number
   getOrder(datum: Datum): number | null
-  setOrder(datum: Datum, order: number): void
+  compare(a: Datum, b: Datum): number
   isCollapsed(datum: Datum): boolean
+}
+
+export type OrderedTreeBuild<Datum> = {
+  roots: OrderedTreeNode<Datum>[]
+  rootData: Datum[]
+  treeSize: number
+  // orphans: OrderedTreeNode<Datum>[]
+  missingOrdersById: Record<string, number>
+  nodesByIndex: Record<number, OrderedTreeNode<Datum>>
+  nodesById: Record<string, OrderedTreeNode<Datum>>
 }
 
 type buildTreeArgs<Datum> = DatumFunctions<Datum> & {
@@ -17,10 +26,11 @@ type buildTreeArgs<Datum> = DatumFunctions<Datum> & {
 export function buildTree<Datum>({
   data,
   ...datumFunctions
-}: buildTreeArgs<Datum>) {
+}: buildTreeArgs<Datum>): OrderedTreeBuild<Datum> {
   console.log("\nBuilding tree")
   const rootData = data.filter((datum) => !datumFunctions.getParentId(datum))
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
+  const nodesById: Record<string, OrderedTreeNode<Datum>> = {}
 
   if (data.length > 0 && rootData.length < 1) {
     if (import.meta.env.MODE !== "test") {
@@ -32,16 +42,32 @@ export function buildTree<Datum>({
     )
   }
 
-  const { nodes, missingOrders, nextIndex } = buildSiblingNodes({
-    data,
+  // OK here we probably need to be returning other stuff here instead of nodes
+
+  const {
+    nodes: roots,
+    missingOrdersById,
+    nextIndex,
+  } = buildSiblingNodes({
+    siblings: rootData,
     ...datumFunctions,
-    siblingData: rootData,
+    data,
     nextIndex: 0,
     nodesByIndex,
+    nodesById,
     parents: [],
   })
 
-  return { roots: nodes, missingOrders, treeSize: nextIndex, nodesByIndex }
+  const build: OrderedTreeBuild<Datum> = {
+    roots,
+    rootData,
+    missingOrdersById,
+    treeSize: nextIndex,
+    nodesByIndex,
+    nodesById,
+  }
+
+  return build
 }
 
 export type OrderedTreeNode<Datum> = {
@@ -59,38 +85,37 @@ export type OrderedTreeNode<Datum> = {
 
 type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
-  siblingData: Datum[]
+  siblings: Datum[]
   nextIndex: number
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
+  nodesById: Record<string, OrderedTreeNode<Datum>>
   parents: OrderedTreeNode<Datum>[]
 }
 
 function buildSiblingNodes<Datum>({
+  siblings,
   data,
-  siblingData,
   getId,
-  compare,
   getOrder,
-  setOrder,
+  compare,
   getParentId,
   isCollapsed,
   nextIndex,
   nodesByIndex,
+  nodesById,
   parents,
 }: BuildNodesArgs<Datum>) {
-  const missingOrders: Record<string, number> = {}
+  const missingOrdersById: Record<string, number> = {}
 
-  const { missingOrders: newmissingOrders, orderedData } = assignMissingOrder({
-    siblingData,
+  const orderedSiblings = sortSiblings({
+    siblings,
+    missingOrdersById,
     getId,
-    compare,
     getOrder,
-    setOrder,
+    compare,
   })
 
-  Object.assign(missingOrders, newmissingOrders)
-
-  const nodes = orderedData.map(function buildNode(
+  const nodes = orderedSiblings.map(function buildNode(
     datum,
     index
   ): OrderedTreeNode<Datum> {
@@ -106,17 +131,24 @@ function buildSiblingNodes<Datum>({
     const parentId = getParentId(datum)
     const key = `${id}-under-${parentId ?? "root"}`
 
+    const order =
+      missingOrdersById[id] ??
+      assert(
+        getOrder(datum),
+        "Expected datum to have an order, but order was %s"
+      )
+
+    /// This won't work, because we're no longer baking the missing orders into the tree
+    /// And in fact we need to audit every call of getOrder because they're probably all wrong
+
     const node: OrderedTreeNode<Datum> = {
       id,
       key,
       data: datum,
-      order: assert(
-        getOrder(datum),
-        "Expected datum to have an order, but order was %s"
-      ),
+      order,
       children: [] as OrderedTreeNode<Datum>[],
       parents: parents,
-      isLastChild: index === orderedData.length - 1,
+      isLastChild: index === orderedSiblings.length - 1,
       isCollapsed: childData.length > 0 && isCollapsed(datum),
       isPlaceholder: false,
       index: nodeIndex,
@@ -125,19 +157,19 @@ function buildSiblingNodes<Datum>({
     if (childData.length > 0 && !isCollapsed(datum)) {
       const {
         nodes: childNodes,
-        missingOrders: moremissingOrders,
+        missingOrdersById: moreMissingOrders,
         nextIndex: newNextIndex,
       } = buildSiblingNodes({
-        siblingData: childData,
+        siblings: childData,
         data,
         getParentId,
         getId,
         compare,
         getOrder,
-        setOrder,
         isCollapsed,
         nextIndex,
         nodesByIndex,
+        nodesById,
         parents: [node, ...parents],
       })
 
@@ -145,38 +177,38 @@ function buildSiblingNodes<Datum>({
         node.children = childNodes
       }
 
-      Object.assign(missingOrders, moremissingOrders)
+      Object.assign(missingOrdersById, moreMissingOrders)
       nextIndex = newNextIndex
     }
 
     nodesByIndex[nodeIndex] = node
+    nodesById[id] = node
 
     return node
   })
 
   return {
     nodes,
-    missingOrders,
+    missingOrdersById,
     nextIndex,
   }
 }
 
 type AssignMissingOrderArgs<Datum> = Pick<
   DatumFunctions<Datum>,
-  "getId" | "getOrder" | "setOrder" | "compare"
+  "getId" | "getOrder" | "compare"
 > & {
-  siblingData: Datum[]
+  missingOrdersById: Record<string, number>
+  siblings: Datum[]
 }
 
-export function assignMissingOrder<Datum>({
-  siblingData,
+export function sortSiblings<Datum>({
+  siblings,
+  missingOrdersById,
   getId,
   getOrder,
-  setOrder,
   compare,
 }: AssignMissingOrderArgs<Datum>) {
-  const missingOrders: Record<string, number> = {}
-
   function datumIsOrdered(datum: Datum) {
     return getOrder(datum) !== null
   }
@@ -185,13 +217,9 @@ export function assignMissingOrder<Datum>({
     return getOrder(datum) === null
   }
 
-  const orderedData = orderBy(
-    siblingData.filter(datumIsOrdered),
-    getOrder,
-    "asc"
-  )
+  const orderedData = orderBy(siblings.filter(datumIsOrdered), getOrder, "asc")
 
-  const unorderedData = siblingData.filter(datumIsNotOrdered)
+  const unorderedData = siblings.filter(datumIsNotOrdered)
   unorderedData.sort(compare)
 
   const firstOrder =
@@ -200,15 +228,11 @@ export function assignMissingOrder<Datum>({
 
   let nextOrder = orderGap
   for (const datum of unorderedData) {
-    setOrder(datum, nextOrder)
-    missingOrders[getId(datum)] = nextOrder
+    missingOrdersById[getId(datum)] = nextOrder
     nextOrder += orderGap
   }
 
-  return {
-    missingOrders,
-    orderedData: [...unorderedData, ...orderedData],
-  }
+  return [...unorderedData, ...orderedData]
 }
 
 type PlaceWithinSiblingsArgs<Datum> = Pick<
@@ -217,6 +241,7 @@ type PlaceWithinSiblingsArgs<Datum> = Pick<
 > & {
   direction: "before" | "after"
   relativeToId: string
+  missingOrdersById: Record<string, number>
   siblings: OrderedTreeNode<Datum>[]
 }
 
@@ -253,6 +278,7 @@ export function placeWithinSiblings<Datum>({
   direction,
   relativeToId,
   siblings,
+  missingOrdersById,
   getOrder,
   getId,
 }: PlaceWithinSiblingsArgs<Datum>) {
@@ -261,9 +287,12 @@ export function placeWithinSiblings<Datum>({
     if (!sibling) {
       throw new Error(`No sibling at index ${index}`)
     }
+
     return assert(
-      getOrder(sibling.data),
-      `Can't call getOrder on an unordered datum (id ${getId(sibling.data)})`
+      missingOrdersById[sibling.id] ?? getOrder(sibling.data),
+      `Can't place a datum within unordered siblings (sibling id ${getId(
+        sibling.data
+      )} is unordered)`
     )
   }
 
