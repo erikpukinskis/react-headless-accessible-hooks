@@ -137,9 +137,40 @@ export class OrderedTreeModel<Datum> {
     return key
   }
 
+  /**
+   * Collapsed nodes won't have any children (even though there technically the
+   * children are just hidden) so determininh whether a node is expanded is just
+   * a question of whether there are any visible children.
+   */
   isExpanded(id: string): boolean {
     const node = this.tree.nodesById[id]
-    return node.children.length > 0
+
+    // If we're not dragging then it's a simple matter of whether the node has
+    // any children
+    if (!this.dragEnd) {
+      return node.children.length > 0
+    }
+
+    // If there are more than one child then it's definitely expanded. Even if
+    // we are dragging one of the children out there's still one left.
+    if (node.children.length > 1) {
+      return true
+    }
+
+    // If we're dragging the placeholder under this node then we're definitely expanded
+    if (id === this.dragEnd.parentId) {
+      return true
+    }
+
+    // At this point, we've verified the placeholder is not in here. So if there
+    // are no other children, we're definitely not expanded.
+    if (node.children.length === 0) {
+      return false
+    }
+
+    // Finally, we know there is only one child, but it may or may not have been
+    // dragged out.
+    return node.children[0].id !== this.dragStart?.node.id
   }
 
   isCollapsed(id: string): boolean {
