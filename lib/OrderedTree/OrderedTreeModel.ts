@@ -123,13 +123,18 @@ export class OrderedTreeModel<Datum> {
   }
 
   getKey(datum: Datum) {
-    const id = this.getId(datum)
+    let key: string
 
     if (datum === this.dragStart?.placeholderDatum) {
-      return `placeholder-node-${id}`
+      const placeholderId = this.getId(this.dragStart.placeholderDatum)
+
+      key = `placeholder-node-${placeholderId}`
     } else {
-      return `ordered-node-${id}`
+      const id = this.getId(datum)
+      key = `ordered-node-${id}`
     }
+
+    return key
   }
 
   isExpanded(id: string): boolean {
@@ -335,7 +340,6 @@ export class OrderedTreeModel<Datum> {
     const oldOrder = this.dragEnd?.order
 
     this.dragEnd = newDrag
-    console.log("new dragEnd", newDrag)
 
     // If there was already a dragEnd previously, there will be an oldParentId
     // here, which means the placeholder has already been placed amidst some

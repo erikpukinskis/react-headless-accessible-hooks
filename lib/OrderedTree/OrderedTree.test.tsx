@@ -53,6 +53,8 @@ describe("OrderedTree", () => {
       clientY: 12,
     })
 
+    expect(rows[0]).toBeInTheDocument()
+
     expect(tree).toHaveTextContent("- Placeholder for First;- First;- Second;")
 
     expect(rows[0]).toHaveComputedStyle({
@@ -316,13 +318,10 @@ describe("OrderedTree", () => {
     const {
       rows: [firstRow, secondRow],
       tree,
-      dump,
     } = renderTree({
       data: [first, second],
       moveNode,
     })
-
-    dump()
 
     layout.mockListBoundingRects([firstRow, secondRow], {
       left: 0,
@@ -698,7 +697,7 @@ function KinNode({ kin }: KinNodeProps) {
 
   if (isPlaceholder) {
     return (
-      <div>
+      <div key={key} role="treeitem">
         {prefix} Placeholder for {kin.name};
       </div>
     )

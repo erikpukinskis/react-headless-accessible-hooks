@@ -72,7 +72,6 @@ export function buildTree<Datum>({
 
 export type OrderedTreeNode<Datum> = {
   id: string
-  key: string
   data: Datum
   order: number
   children: OrderedTreeNode<Datum>[]
@@ -128,8 +127,6 @@ function buildSiblingNodes<Datum>({
     nextIndex++
 
     const id = getId(datum)
-    const parentId = getParentId(datum)
-    const key = `${id}-under-${parentId ?? "root"}`
 
     const order =
       missingOrdersById[id] ??
@@ -143,7 +140,6 @@ function buildSiblingNodes<Datum>({
 
     const node: OrderedTreeNode<Datum> = {
       id,
-      key,
       data: datum,
       order,
       children: [] as OrderedTreeNode<Datum>[],

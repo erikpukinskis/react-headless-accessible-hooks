@@ -128,6 +128,15 @@ export function useOrderedTree<Datum>({
       })
   )
 
+  const [TreeProvider] = useState(
+    () =>
+      function TreeProvider({ children }: { children: React.ReactNode }) {
+        return (
+          <OrderedTreeProvider model={model}>{children}</OrderedTreeProvider>
+        )
+      }
+  )
+
   useEffect(() => {
     model.setMoveNode(moveNode)
   }, [model, moveNode])
@@ -170,13 +179,6 @@ export function useOrderedTree<Datum>({
     }
   }
 
-  function TreeProvider(
-    this: void,
-    { children }: { children: React.ReactNode }
-  ) {
-    return <OrderedTreeProvider model={model}>{children}</OrderedTreeProvider>
-  }
-
   function getKey(datum: Datum) {
     return model.getKey(datum)
   }
@@ -217,6 +219,9 @@ export function useOrderedTreeNode<Datum>(
       role: "treeitem",
     }
   }, [model, key, datum])
+
+  // TODO: do we want getPlaceholderProps with some of the above?
+  // TODO: do we need key in the above?
 
   const depth = isPlaceholder
     ? model.getPlaceholderDepth()
