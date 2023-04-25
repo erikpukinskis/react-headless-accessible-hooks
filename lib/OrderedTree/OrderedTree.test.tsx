@@ -1,7 +1,7 @@
 import { render, fireEvent, cleanup } from "@testing-library/react"
 import produce from "immer"
 import { startCase } from "lodash"
-import React, { useState } from "react"
+import React, { Profiler, useState } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import type { DatumFunctions, UseOrderedTreeArgs } from "./useOrderedTree"
@@ -166,9 +166,12 @@ describe("OrderedTree", () => {
       top: 0,
     })
 
+    const onMount = vi.fn()
+
     const { rows, tree } = renderTree({
       data: [parent, child, secondChild],
       moveNode,
+      onMount,
     })
 
     layout.mockListBoundingRects(rows, {
@@ -209,6 +212,8 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent(
       "v Parent;-v Child;--- Placeholder for Third;- Third;"
     )
+
+    expect(onMount).toHaveBeenCalledOnce()
   })
 
   it("drags two nodes right", () => {
@@ -397,9 +402,12 @@ describe("OrderedTree", () => {
       top: 0,
     })
 
+    const onMount = vi.fn()
+
     const { rows, tree } = renderTree({
       data: [first, second],
       moveNode,
+      onMount,
     })
 
     layout.mockListBoundingRects(rows, {
@@ -579,11 +587,23 @@ function buildKin({ id, name, ...overrides }: KinOverrides) {
   }
 }
 
+type RenderTreeArgs = KinTreeProps & {
+  onMount?(): void
+}
 /**
  * Render the test Tree component and return some of the elements
  */
-function renderTree(props: KinTreeProps) {
-  const result = render(<KinTree {...props} />)
+function renderTree({ onMount, ...props }: RenderTreeArgs) {
+  const result = render(
+    <Profiler
+      id="KinTree"
+      onRender={(_, phase) => {
+        if (phase === "mount") onMount?.()
+      }}
+    >
+      <KinTree {...props} />
+    </Profiler>
+  )
 
   const rows = result.queryAllByRole("treeitem")
   const tree = result.getByRole("tree")
@@ -641,7 +661,7 @@ function KinTree({ data: initialData, moveNode, ...overrides }: KinTreeProps) {
     moveNode?.(id, newOrder, newParentId)
   }
 
-  const { roots, getTreeProps, TreeProvider, getKey } = useOrderedTree({
+  const { roots, getTreeProps, getKey, TreeProvider } = useOrderedTree({
     moveNode: moveNodeAndSave,
     data,
     ...DATUM_FUNCTIONS,
@@ -652,7 +672,7 @@ function KinTree({ data: initialData, moveNode, ...overrides }: KinTreeProps) {
     <div {...getTreeProps()}>
       <TreeProvider>
         {roots.map((node) => (
-          <KinNode key={getKey(node)} kin={node} />
+          <KinNode key={getKey(node)} data-key={getKey(node)} kin={node} />
         ))}
       </TreeProvider>
     </div>
@@ -686,9 +706,9 @@ function KinNode({ kin }: KinNodeProps) {
     getNodeProps,
     depth,
     isPlaceholder,
-    key,
     isExpanded,
     isCollapsed,
+    getKey,
   } = useOrderedTreeNode(kin)
 
   const prefix = `${[...(Array(depth) as unknown[])].map(() => "-").join("")}${
@@ -697,7 +717,7 @@ function KinNode({ kin }: KinNodeProps) {
 
   if (isPlaceholder) {
     return (
-      <div key={key} role="treeitem">
+      <div data-key={getKey(kin)} role="treeitem">
         {prefix} Placeholder for {kin.name};
       </div>
     )
@@ -709,7 +729,7 @@ function KinNode({ kin }: KinNodeProps) {
         {prefix} {kin.name};
       </div>
       {children.map((child) => (
-        <KinNode key={key} kin={child} />
+        <KinNode key={getKey(child)} kin={child} />
       ))}
     </>
   )

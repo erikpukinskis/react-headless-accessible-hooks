@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import type { DatumFunctions, OrderedTreeNode } from "./buildTree"
@@ -107,12 +108,12 @@ export function useOrderedTree<Datum>({
     []
   )
 
-  const [tree, setTree] = useState(function getTreeState() {
-    return buildTree({
+  const [tree, setTree] = useState(() =>
+    buildTree({
       data,
       ...datumFunctions,
     })
-  })
+  )
 
   const [model] = useState(
     () =>
@@ -141,9 +142,20 @@ export function useOrderedTree<Datum>({
     model.setMoveNode(moveNode)
   }, [model, moveNode])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => model.cleanup(), [])
+
   const rootsWithPlaceholder = useChildData(tree.roots, null, model, false)
 
+  const isFirstRenderRef = useRef(true)
+
   useEffect(() => {
+    if (isFirstRenderRef.current) {
+      // We don't need to rebuild the tree on the first render
+      isFirstRenderRef.current = false
+      return
+    }
+
     const newTree = buildTree({
       data,
       ...datumFunctions,
@@ -191,6 +203,16 @@ export function useOrderedTree<Datum>({
   }
 }
 
+export function TreeProvider<Datum>({
+  children,
+  model,
+}: {
+  children: React.ReactNode
+  model: OrderedTreeModel<Datum>
+}) {
+  return <OrderedTreeProvider model={model}>{children}</OrderedTreeProvider>
+}
+
 type UseOrderedTreeNodeReturnType<Datum> = {
   children: Datum[]
   getNodeProps: GetNodeProps
@@ -200,7 +222,7 @@ type UseOrderedTreeNodeReturnType<Datum> = {
   isExpanded: boolean
   isCollapsed: boolean
   isPlaceholder: boolean
-  key: string
+  getKey: (datum: Datum) => string
 }
 
 export function useOrderedTreeNode<Datum>(
@@ -210,15 +232,13 @@ export function useOrderedTreeNode<Datum>(
   const node = model.getNode(datum)
   const isPlaceholder = model.isPlaceholder(datum)
   const children = useChildData(node.children, node.id, model, isPlaceholder)
-  const key = model.getKey(datum)
 
   const getNodeProps = useCallback<GetNodeProps>(() => {
     return {
       onMouseDown: model.handleMouseDown.bind(model, datum),
-      key,
       role: "treeitem",
     }
-  }, [model, key, datum])
+  }, [model, datum])
 
   // TODO: do we want getPlaceholderProps with some of the above?
   // TODO: do we need key in the above?
@@ -232,8 +252,9 @@ export function useOrderedTreeNode<Datum>(
   const hasChildren =
     children.length > 1 || (children.length === 1 && !childIsBeingDragged)
 
+  const getKey = useCallback((datum: Datum) => model.getKey(datum), [model])
+
   return {
-    key,
     children,
     getNodeProps,
     depth,
@@ -242,6 +263,7 @@ export function useOrderedTreeNode<Datum>(
     isCollapsed: model.isCollapsed(node.id),
     isPlaceholder: model.isPlaceholder(datum),
     hasChildren,
+    getKey,
   }
 }
 
@@ -286,7 +308,7 @@ function useChildData<Datum>(
         return children.map((node) => node.data)
       }
 
-      return splicePlaceholder(
+      const data = splicePlaceholder(
         children,
         assert(
           model.getPlaceholderData(),
@@ -297,9 +319,41 @@ function useChildData<Datum>(
           "Do not have placeholder order, even though placeholder is included in these siblings"
         )
       )
+
+      // assertUniqueKeys(data, model)
+
+      return data
     },
     [model, children, placeholderIsIncluded, placeholderOrder, isPlaceholder]
   )
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function assertUniqueKeys<Datum>(
+  data: Datum[],
+  model: OrderedTreeModel<Datum>
+) {
+  const keys: Record<string, boolean> = {}
+  const duplicateKeys: string[] = []
+
+  for (const datum of data) {
+    const key = model.getKey(datum)
+    if (keys[key]) {
+      duplicateKeys.push(key)
+    } else {
+      keys[key] = true
+    }
+  }
+
+  if (duplicateKeys.length > 0) {
+    throw new Error(
+      `Key${duplicateKeys.length > 1 ? "s" : ""} ${duplicateKeys.join(
+        ","
+      )} appear${
+        duplicateKeys.length > 1 ? "" : "s"
+      } twice in siblings: ${Object.keys(keys).join(",")}`
+    )
+  }
 }
 
 /**

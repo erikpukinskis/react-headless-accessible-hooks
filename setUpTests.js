@@ -1,6 +1,18 @@
 import matchers from "@testing-library/jest-dom/matchers"
 import { expect } from "vitest"
 
+// We don't want any pseudo-errors to slip through. Stuff like "Can't perform a
+// React state update on an unmounted component"
+console.error = function () {
+  let [message, ...substitutions] = Array.from(arguments)
+
+  for (const substitution of substitutions) {
+    message = message.replace("%s", substitution)
+  }
+
+  throw new Error(message)
+}
+
 expect.extend(matchers)
 
 expect.extend({

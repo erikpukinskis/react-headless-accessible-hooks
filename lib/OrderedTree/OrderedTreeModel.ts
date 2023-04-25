@@ -61,12 +61,10 @@ export class OrderedTreeModel<Datum> {
   }
 
   cleanup() {
-    const { dragStart } = this
+    if (!this.dragStart) return
 
-    if (!dragStart) return
-
-    window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
-    window.removeEventListener("mouseup", dragStart.mouseUpHandler)
+    window.removeEventListener("mousemove", this.dragStart.mouseMoveHandler)
+    window.removeEventListener("mouseup", this.dragStart.mouseUpHandler)
   }
 
   setMoveNode(callback: MoveNodeHandler) {
@@ -454,6 +452,7 @@ export class OrderedTreeModel<Datum> {
     }
 
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
+    window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
 
     if (isLackingPrecision(dragEnd.order)) {
       throw new Error(
