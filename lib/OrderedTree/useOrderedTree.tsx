@@ -1,3 +1,4 @@
+import { isEmpty } from "lodash"
 import {
   createContext,
   useCallback,
@@ -12,7 +13,7 @@ import { buildTree } from "./buildTree"
 import type { PlaceholderListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
-import { makeUninitializedContext, assert } from "~/helpers"
+import { makeUninitializedContext } from "~/helpers"
 
 export type { DatumFunctions } from "./buildTree"
 
@@ -65,7 +66,8 @@ function OrderedTreeProvider<Datum>({
 
 export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
-  moveNode(id: string, newOrder: number, newParentId: string | null): void
+  onNodeMove(id: string, newOrder: number, newParentId: string | null): void
+  onBulkNodeOrder(ordersById: Record<string, number>): void
   dump?: DebugDataDumper
 }
 
@@ -94,8 +96,12 @@ export function useOrderedTree<Datum>({
 
   // Callbacks
   dump,
-  moveNode,
+  onNodeMove,
+  onBulkNodeOrder,
 }: UseOrderedTreeArgs<Datum>): UseOrderedTreeReturnType<Datum> {
+  const bulkOrderRef = useRef(onBulkNodeOrder)
+  bulkOrderRef.current = onBulkNodeOrder
+
   const datumFunctions = useMemo(
     () => ({
       getParentId,
@@ -123,7 +129,7 @@ export function useOrderedTree<Datum>({
         getOrder,
         getId,
         dump,
-        moveNode,
+        moveNode: onNodeMove,
         collapseNode: () => {},
         expandNode: () => {},
       })
@@ -139,8 +145,8 @@ export function useOrderedTree<Datum>({
   )
 
   useEffect(() => {
-    model.setMoveNode(moveNode)
-  }, [model, moveNode])
+    model.setMoveNode(onNodeMove)
+  }, [model, onNodeMove])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => model.cleanup(), [])
@@ -164,6 +170,12 @@ export function useOrderedTree<Datum>({
     setTree(newTree)
     model.setTree(newTree)
   }, [data, model, datumFunctions])
+
+  useEffect(() => {
+    if (isEmpty(tree.missingOrdersById)) return
+
+    bulkOrderRef.current(tree.missingOrdersById)
+  }, [tree])
 
   function getTreeProps() {
     return {
@@ -273,7 +285,6 @@ function useChildData<Datum>(
   model: OrderedTreeModel<Datum>,
   isPlaceholder: boolean
 ): Datum[] {
-  const [placeholderIsIncluded, setPlaceholderIncluded] = useState(false)
   const [placeholderOrder, setPlaceholderOrder] = useState<number | undefined>(
     undefined
   )
@@ -285,8 +296,7 @@ function useChildData<Datum>(
       isIncludedNow,
       order
     ) => {
-      setPlaceholderIncluded(isIncludedNow)
-      setPlaceholderOrder(order)
+      setPlaceholderOrder(isIncludedNow ? order : undefined)
     }
 
     model.addPlaceholderListener(parentId, handlePlaceholderChange)
@@ -304,27 +314,34 @@ function useChildData<Datum>(
         return children.map((node) => node.data)
       }
 
-      if (!placeholderIsIncluded) {
+      if (placeholderOrder === undefined) {
         return children.map((node) => node.data)
       }
 
-      const data = splicePlaceholder(
-        children,
-        assert(
-          model.getPlaceholderData(),
-          "Could not get placeholder id, even though placeholder is included in these siblings"
-        ),
-        assert(
-          placeholderOrder,
+      if (placeholderOrder === undefined) {
+        throw new Error(
           "Do not have placeholder order, even though placeholder is included in these siblings"
         )
+      }
+
+      const placeholderDatum = model.getPlaceholderData()
+
+      if (!placeholderDatum) {
+        throw new Error(
+          "Could not get placeholder id, even though placeholder is included in these siblings"
+        )
+      }
+      const data = splicePlaceholder(
+        children,
+        model.getPlaceholderData(),
+        placeholderOrder
       )
 
       // assertUniqueKeys(data, model)
 
       return data
     },
-    [model, children, placeholderIsIncluded, placeholderOrder, isPlaceholder]
+    [model, children, placeholderOrder, isPlaceholder]
   )
 }
 

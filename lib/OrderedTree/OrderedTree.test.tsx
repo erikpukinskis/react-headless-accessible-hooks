@@ -29,7 +29,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [first, second],
-      moveNode,
+      onNodeMove: moveNode,
     })
 
     expect(rows).toHaveLength(2)
@@ -79,6 +79,52 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
+  it.only("drag node above", () => {
+    const moveNode = vi.fn()
+
+    const first = buildKin({ id: "first", order: 0.4, parentId: null })
+    const second = buildKin({ id: "second", order: 0.6, parentId: null })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 40,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [first, second],
+      onNodeMove: moveNode,
+    })
+
+    expect(tree).toHaveTextContent("- First;- Second;")
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[1], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(rows[1], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    fireEvent.mouseUp(rows[1], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    expect(tree).toHaveTextContent("- Second;- First;")
+    expect(moveNode).toHaveBeenCalledWith("second", 0.2, null)
+  })
+
   it("places a node as a child of another", () => {
     const moveNode = vi.fn()
 
@@ -95,7 +141,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [first, second, third],
-      moveNode,
+      onNodeMove: moveNode,
     })
 
     layout.mockListBoundingRects(rows, {
@@ -170,7 +216,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [parent, child, secondChild],
-      moveNode,
+      onNodeMove: moveNode,
       onMount,
     })
 
@@ -236,7 +282,7 @@ describe("OrderedTree", () => {
           parentId: null,
         }),
       ],
-      moveNode,
+      onNodeMove: moveNode,
     })
 
     const [_, son, daughter] = rows
@@ -325,7 +371,7 @@ describe("OrderedTree", () => {
       tree,
     } = renderTree({
       data: [first, second],
-      moveNode,
+      onNodeMove: moveNode,
     })
 
     layout.mockListBoundingRects([firstRow, secondRow], {
@@ -406,7 +452,7 @@ describe("OrderedTree", () => {
 
     const { rows, tree } = renderTree({
       data: [first, second],
-      moveNode,
+      onNodeMove: moveNode,
       onMount,
     })
 
@@ -640,7 +686,11 @@ type KinTreeProps = Partial<UseOrderedTreeArgs<Kin>> & {
  * This component sets up the `useOrderedTree` hook, its callbacks, and then
  * renders out the root nodes (where the parent id is `null`).
  */
-function KinTree({ data: initialData, moveNode, ...overrides }: KinTreeProps) {
+function KinTree({
+  data: initialData,
+  onNodeMove: moveNode,
+  ...overrides
+}: KinTreeProps) {
   const [data, setData] = useState(initialData)
 
   function moveNodeAndSave(
@@ -661,8 +711,21 @@ function KinTree({ data: initialData, moveNode, ...overrides }: KinTreeProps) {
     moveNode?.(id, newOrder, newParentId)
   }
 
+  function updateBulkOrder(ordersById: Record<string, number>) {
+    const reorderedData = data.map((kin) => {
+      const newOrder = ordersById[kin.id]
+
+      if (newOrder === undefined) return kin
+
+      return { ...kin, order: newOrder }
+    })
+
+    setData(reorderedData)
+  }
+
   const { roots, getTreeProps, getKey, TreeProvider } = useOrderedTree({
-    moveNode: moveNodeAndSave,
+    onNodeMove: moveNodeAndSave,
+    onBulkNodeOrder: updateBulkOrder,
     data,
     ...DATUM_FUNCTIONS,
     ...overrides,

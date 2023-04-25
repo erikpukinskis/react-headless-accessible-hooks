@@ -116,7 +116,8 @@ function Template({ data: initialData }: TemplateProps) {
 
   const { roots, getTreeProps, TreeProvider, getKey } = useOrderedTree({
     data,
-    moveNode(id, newOrder, newParentId) {
+    onNodeMove(id, newOrder, newParentId) {
+      console.log("move node", id, "to", newOrder, "under", newParentId)
       const index = data.findIndex((datum) => datum.id === id)
       const oldDatum = data[index]
 
@@ -134,6 +135,17 @@ function Template({ data: initialData }: TemplateProps) {
       newArray[index] = newDatum
 
       setData(newArray)
+    },
+    onBulkNodeOrder(ordersById) {
+      setData(
+        data.map((kin) => {
+          const newOrder = ordersById[kin.id]
+
+          if (newOrder === undefined) return kin
+
+          return { ...kin, order: newOrder }
+        })
+      )
     },
     getId: (kin) => kin.id,
     getParentId: (kin) => kin.parentId,
@@ -210,7 +222,7 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     isBeingDragged,
     hasChildren,
     isCollapsed,
-    key,
+    getKey,
   } = useOrderedTreeNode(kin)
 
   if (isPlaceholder) {
@@ -243,7 +255,7 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
         </span>
       </DraggableRow>
       {children.map((child) => (
-        <TreeRows key={key} kin={child} />
+        <TreeRows key={getKey(child)} kin={child} />
       ))}
     </>
   )
