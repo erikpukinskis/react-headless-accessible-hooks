@@ -326,7 +326,15 @@ export class OrderedTreeModel<Datum> {
         "Why is relativeTo undefined if we're dragging somewhere?"
       )
     } else if (dragData.move === "first-child") {
-      newOrder = 0.5
+      newOrder = placeWithinSiblings({
+        direction: "first-child",
+        relativeToId: dragData.relativeTo.id,
+        siblings: dragData.relativeTo.children,
+        missingOrdersById: this.tree.missingOrdersById,
+        getOrder: this.getOrder.bind(this),
+        getId: this.getId,
+      })
+
       newParentId = dragData.relativeTo.id
       newDepth = dragData.relativeTo.parents.length + 1
     } else {

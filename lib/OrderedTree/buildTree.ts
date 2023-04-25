@@ -236,8 +236,8 @@ type PlaceWithinSiblingsArgs<Datum> = Pick<
   DatumFunctions<Datum>,
   "getOrder" | "getId"
 > & {
-  direction: "before" | "after"
-  relativeToId: string
+  direction: "before" | "after" | "first-child"
+  relativeToId?: string
   missingOrdersById: Record<string, number>
   siblings: OrderedTreeNode<Datum>[]
 }
@@ -293,24 +293,41 @@ export function placeWithinSiblings<Datum>({
     )
   }
 
-  if (direction === "before") {
-    const indexAfter = siblings.findIndex(
-      (sibling) => getId(sibling.data) === relativeToId
+  if (direction === "first-child") {
+    if (siblings.length === 0) return 0.5
+
+    const previousFirstChildOrder = getGuaranteedOrder(0)
+
+    return previousFirstChildOrder / 2
+  }
+
+  const relativeIndex = siblings.findIndex(
+    (sibling) => getId(sibling.data) === relativeToId
+  )
+
+  if (relativeIndex < 0) {
+    throw new Error(
+      `Could not find relative sibling ${
+        relativeToId ?? "undefined"
+      } in siblings array`
     )
+  }
+
+  if (direction === "before") {
+    const indexAfter = relativeIndex
     const orderAfter = getGuaranteedOrder(indexAfter)
     const isFirst = indexAfter === 0
     const orderBefore = isFirst ? 0 : getGuaranteedOrder(indexAfter - 1)
+
     return orderBefore + (orderAfter - orderBefore) / 2
-  } else {
-    const indexBefore = siblings.findIndex(
-      (sibling) => getId(sibling.data) === relativeToId
-    )
-    if (indexBefore < 0) {
-      throw new Error("Could not find relative sibling in siblings array")
-    }
+  } else if (direction === "after") {
+    const indexBefore = relativeIndex
     const orderBefore = getGuaranteedOrder(indexBefore)
     const isLast = indexBefore === siblings.length - 1
     const orderAfter = isLast ? 1 : getGuaranteedOrder(indexBefore + 1)
+
     return orderBefore + (orderAfter - orderBefore) / 2
+  } else {
+    throw new Error(`Bad direction ${direction}`)
   }
 }

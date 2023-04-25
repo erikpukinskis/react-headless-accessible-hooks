@@ -12,40 +12,43 @@ type Kin = {
   isCollapsed: boolean
 }
 
-const DATA: Kin[] = [
-  {
-    id: "gramps",
-    createdAt: "2022-01-01",
-    name: "gramps",
-    parentId: null,
-    order: null,
-    isCollapsed: false,
-  },
-  {
-    id: "auntie",
-    createdAt: "2022-01-02",
-    name: "auntie",
-    parentId: "gramps",
-    order: null,
-    isCollapsed: false,
-  },
-  {
-    id: "momma",
-    createdAt: "2022-01-03",
-    name: "momma",
-    parentId: "gramps",
-    order: null,
-    isCollapsed: false,
-  },
-  {
-    id: "grandkid",
-    createdAt: "2022-01-04",
-    name: "grandkid",
-    parentId: "momma",
-    order: null,
-    isCollapsed: false,
-  },
-]
+const GRAMPS = {
+  id: "gramps",
+  createdAt: "2022-01-01",
+  name: "gramps",
+  parentId: null,
+  order: null,
+  isCollapsed: false,
+}
+
+const AUNTIE = {
+  id: "auntie",
+  createdAt: "2022-01-02",
+  name: "auntie",
+  parentId: "gramps",
+  order: null,
+  isCollapsed: false,
+}
+
+const MOMMA = {
+  id: "momma",
+  createdAt: "2022-01-03",
+  name: "momma",
+  parentId: "gramps",
+  order: null,
+  isCollapsed: false,
+}
+
+const GRANDKID = {
+  id: "grandkid",
+  createdAt: "2022-01-04",
+  name: "grandkid",
+  parentId: "momma",
+  order: null,
+  isCollapsed: false,
+}
+
+const DATA: Kin[] = [GRAMPS, AUNTIE, MOMMA, GRANDKID]
 
 const FUNCTIONS: DatumFunctions<Kin> = {
   getId: (kin) => kin.id,
@@ -259,36 +262,27 @@ describe("buildTree", () => {
     ).toBeCloseTo(0.5)
   })
 
+  it("inserts a new first child before an existing child", () => {
+    const { roots, missingOrdersById } = buildTree({
+      data: cloneDeep(DATA),
+      ...FUNCTIONS,
+    })
+
+    const gramps = roots[0]
+
+    expect(
+      placeWithinSiblings({
+        direction: "first-child",
+        siblings: gramps.children,
+        missingOrdersById,
+        ...FUNCTIONS,
+      })
+    ).toBeCloseTo(0.1666)
+  })
+
   it("throws when there are no root nodes", () => {
-    const AUNTIE: Kin = {
-      id: "auntie",
-      createdAt: "2022-01-02",
-      name: "Auntie",
-      parentId: "gramps",
-      order: null,
-      isCollapsed: false,
-    }
-
-    const MOMMA: Kin = {
-      id: "momma",
-      createdAt: "2022-01-03",
-      name: "Momma",
-      parentId: "gramps",
-      order: null,
-      isCollapsed: false,
-    }
-
-    const KIDDO: Kin = {
-      id: "kiddo",
-      createdAt: "2022-01-04",
-      name: "Kiddo",
-      parentId: "momma",
-      order: null,
-      isCollapsed: false,
-    }
-
     expect(() => {
-      buildTree({ data: [AUNTIE, MOMMA, KIDDO], ...FUNCTIONS })
+      buildTree({ data: [AUNTIE, MOMMA, GRANDKID], ...FUNCTIONS })
     }).toThrow("Every node in the tree had a parent")
   })
 })

@@ -79,52 +79,6 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
-  it.only("drag node above", () => {
-    const moveNode = vi.fn()
-
-    const first = buildKin({ id: "first", order: 0.4, parentId: null })
-    const second = buildKin({ id: "second", order: 0.6, parentId: null })
-
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 40,
-      left: 0,
-      top: 0,
-    })
-
-    const { rows, tree } = renderTree({
-      data: [first, second],
-      onNodeMove: moveNode,
-    })
-
-    expect(tree).toHaveTextContent("- First;- Second;")
-
-    layout.mockListBoundingRects(rows, {
-      left: 0,
-      top: 0,
-      width: 200,
-      height: 20,
-    })
-
-    fireEvent.mouseDown(rows[1], {
-      clientX: 10,
-      clientY: 30,
-    })
-
-    fireEvent.mouseMove(rows[1], {
-      clientX: 10,
-      clientY: 10,
-    })
-
-    fireEvent.mouseUp(rows[1], {
-      clientX: 10,
-      clientY: 10,
-    })
-
-    expect(tree).toHaveTextContent("- Second;- First;")
-    expect(moveNode).toHaveBeenCalledWith("second", 0.2, null)
-  })
-
   it("places a node as a child of another", () => {
     const moveNode = vi.fn()
 
@@ -192,6 +146,60 @@ describe("OrderedTree", () => {
     expect(moveNode).toHaveBeenCalledWith("second", 0.5, "first")
 
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
+  })
+
+  it.only("drags a sibling before a child", () => {
+    const moveNode = vi.fn()
+
+    const parent = buildKin({ id: "parent", order: 0.2, parentId: null })
+    const child = buildKin({ id: "child", order: 0.5, parentId: "parent" })
+    const secondChild = buildKin({
+      id: "second-child",
+      order: 0.6,
+      parentId: null,
+    })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [parent, child, secondChild],
+      onNodeMove: moveNode,
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[2], {
+      clientX: 10,
+      clientY: 50,
+    })
+
+    fireEvent.mouseMove(rows[2], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v Parent;-- Placeholder for Second Child;-- Child;- Second Child;"
+    )
+
+    fireEvent.mouseUp(rows[2], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    expect(moveNode).toHaveBeenCalledWith("second-child", 0.25, "parent")
+
+    expect(tree).toHaveTextContent("v Parent;- Second Child;- Child;")
   })
 
   it("drags right to place a node as grandchild", () => {
