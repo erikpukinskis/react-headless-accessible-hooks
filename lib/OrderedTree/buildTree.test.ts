@@ -95,22 +95,6 @@ describe("buildTree", () => {
     expect(auntieBranch.parents[0].data.name).toBe("gramps")
   })
 
-  it("should mark last siblings", () => {
-    const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
-
-    expect(roots[0].data.name).toBe("gramps")
-    expect(roots[0].isLastChild).toBe(true)
-
-    expect(roots[0].children[0].data.name).toBe("momma")
-    expect(roots[0].children[0].isLastChild).toBe(false)
-
-    expect(roots[0].children[0].children[0].data.name).toBe("grandkid")
-    expect(roots[0].children[0].children[0].isLastChild).toBe(true)
-
-    expect(roots[0].children[1].data.name).toBe("auntie")
-    expect(roots[0].children[1].isLastChild).toBe(true)
-  })
-
   it("should add indexes for needs within the full tree", () => {
     const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
 

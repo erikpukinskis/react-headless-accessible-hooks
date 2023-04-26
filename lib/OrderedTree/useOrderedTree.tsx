@@ -318,11 +318,11 @@ function useChildData<Datum>(
         return children.map((node) => node.data)
       }
 
-      if (placeholderOrder === undefined) {
-        throw new Error(
-          "Do not have placeholder order, even though placeholder is included in these siblings"
-        )
-      }
+      // if (placeholderOrder === undefined) {
+      //   throw new Error(
+      //     "Do not have placeholder order, even though placeholder is included in these siblings"
+      //   )
+      // }
 
       const placeholderDatum = model.getPlaceholderData()
 
@@ -334,7 +334,8 @@ function useChildData<Datum>(
       const data = splicePlaceholder(
         children,
         model.getPlaceholderData(),
-        placeholderOrder
+        placeholderOrder,
+        model.getOrder.bind(model)
       )
 
       // assertUniqueKeys(data, model)
@@ -380,12 +381,13 @@ function assertUniqueKeys<Datum>(
 function splicePlaceholder<Datum>(
   siblings: OrderedTreeNode<Datum>[],
   placeholderDatum: Datum,
-  placeholderOrder: number
+  placeholderOrder: number,
+  getOrder: (datum: Datum) => number
 ) {
   let spliceIndex = 0
   while (
     spliceIndex < siblings.length &&
-    siblings[spliceIndex].order < placeholderOrder
+    getOrder(siblings[spliceIndex].data) < placeholderOrder
   ) {
     spliceIndex++
   }

@@ -176,6 +176,22 @@ export class OrderedTreeModel<Datum> {
     return node.isCollapsed
   }
 
+  isLastChild(id: string): boolean {
+    const node = this.tree.nodesById[id]
+
+    const siblings =
+      node.parents.length < 1 ? this.tree.roots : node.parents[0].children
+
+    let lastChild = siblings[siblings.length - 1]
+    const lastChildIsBeingDragged = lastChild.id === this.dragStart?.node.id
+
+    if (lastChildIsBeingDragged) {
+      lastChild = siblings[siblings.length - 2]
+    }
+
+    return id === lastChild.id
+  }
+
   isPlaceholder(datum: Datum): boolean {
     return datum === this.dragStart?.placeholderDatum
   }
@@ -295,7 +311,9 @@ export class OrderedTreeModel<Datum> {
       this.dragStart.node.index,
       hoverIndex,
       dx,
-      dy
+      dy,
+      this.isCollapsed.bind(this),
+      this.isLastChild.bind(this)
     )
 
     const { relativeTo } = dragData
@@ -430,7 +448,7 @@ export class OrderedTreeModel<Datum> {
       clientX: this.clientX,
       clientY: this.clientY,
       treeBox: this.treeBox,
-      originalOrder: node.order,
+      originalOrder: this.getOrder(node.data),
       mouseMoveHandler,
       mouseUpHandler,
     }

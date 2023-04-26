@@ -74,13 +74,10 @@ export function buildTree<Datum>({
 export type OrderedTreeNode<Datum> = {
   id: string
   data: Datum
-  order: number
   children: OrderedTreeNode<Datum>[]
   parents: OrderedTreeNode<Datum>[]
-  isLastChild: boolean
-  isCollapsed: boolean
-  isPlaceholder: boolean
   index: number
+  isCollapsed: boolean
 }
 
 type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
@@ -116,8 +113,7 @@ function buildSiblingNodes<Datum>({
   })
 
   const nodes = orderedSiblings.map(function buildNode(
-    datum,
-    index
+    datum
   ): OrderedTreeNode<Datum> {
     const childData = data.filter(
       (possibleChild) => getParentId(possibleChild) === getId(datum)
@@ -129,26 +125,13 @@ function buildSiblingNodes<Datum>({
 
     const id = getId(datum)
 
-    const order =
-      missingOrdersById[id] ??
-      assert(
-        getOrder(datum),
-        "Expected datum to have an order, but order was %s"
-      )
-
-    /// This won't work, because we're no longer baking the missing orders into the tree
-    /// And in fact we need to audit every call of getOrder because they're probably all wrong
-
     const node: OrderedTreeNode<Datum> = {
       id,
       data: datum,
-      order,
       children: [] as OrderedTreeNode<Datum>[],
       parents: parents,
-      isLastChild: index === orderedSiblings.length - 1,
-      isCollapsed: childData.length > 0 && isCollapsed(datum),
-      isPlaceholder: false,
       index: nodeIndex,
+      isCollapsed: childData.length > 0 && isCollapsed(datum),
     }
 
     if (childData.length > 0 && !isCollapsed(datum)) {
@@ -328,6 +311,6 @@ export function placeWithinSiblings<Datum>({
 
     return orderBefore + (orderAfter - orderBefore) / 2
   } else {
-    throw new Error(`Bad direction ${direction}`)
+    throw new Error(`Bad direction ${direction as string}`)
   }
 }

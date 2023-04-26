@@ -23,7 +23,9 @@ export function getDrag<Datum>(
   downRowIndex: number | undefined,
   hoverIndex: number,
   dx: number | undefined,
-  dy: number | undefined
+  dy: number | undefined,
+  isCollapsed: (id: string) => boolean,
+  isLastChild: (id: string) => boolean
 ): DragData<Datum> {
   if (dx === 0 && dy === 0) {
     return {
@@ -125,7 +127,7 @@ export function getDrag<Datum>(
 
   // If we're dragging farther right than the depth of the row above, we should
   // be able to insert as the first child (assuming it's not a collapsed node)
-  if (targetDepth > relativeDepth && !nodeAbove.isCollapsed) {
+  if (targetDepth > relativeDepth && !isCollapsed(nodeAbove.id)) {
     return {
       ...data,
       move: "first-child",
@@ -148,7 +150,11 @@ export function getDrag<Datum>(
   }
 
   // Otherwise we want to insert after the node above (or one of its parents)
-  const bestAncestor = getAncestorClosestToDepth(targetDepth, nodeAbove)
+  const bestAncestor = getAncestorClosestToDepth(
+    targetDepth,
+    nodeAbove,
+    isLastChild
+  )
 
   return {
     ...data,
@@ -159,7 +165,8 @@ export function getDrag<Datum>(
 
 function getAncestorClosestToDepth<Datum>(
   targetDepth: number,
-  node: OrderedTreeNode<Datum>
+  node: OrderedTreeNode<Datum>,
+  isLastChild: (id: string) => boolean
 ) {
   const ancestors = getAncestorChain(node, targetDepth)
 
@@ -174,7 +181,6 @@ function getAncestorClosestToDepth<Datum>(
   for (let loop = targetDepth; loop <= MAX_LOOP; loop++) {
     const ancestor = ancestors[ancestorIndex]
 
-    /// Why do we care if it's a last child? We care if the _next_ ancestor is the last child
     const baby = ancestors[ancestorIndex + 1]
 
     if (!baby) {
@@ -184,7 +190,8 @@ function getAncestorClosestToDepth<Datum>(
       return ancestor
     }
 
-    if (baby.isLastChild) {
+    /// This doesn't work if the drag node is the last child. It's still a "last child"
+    if (isLastChild(baby.id)) {
       // The ancestor is a good depth, and there are no more siblings below
       // here, so we can insert after the ancestor
       return ancestor

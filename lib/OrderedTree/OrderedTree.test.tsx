@@ -148,7 +148,7 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("v First;-- Second;- Third;")
   })
 
-  it.only("drags a sibling before a child", () => {
+  it("drags a sibling before a child", () => {
     const moveNode = vi.fn()
 
     const parent = buildKin({ id: "parent", order: 0.2, parentId: null })
@@ -199,7 +199,7 @@ describe("OrderedTree", () => {
 
     expect(moveNode).toHaveBeenCalledWith("second-child", 0.25, "parent")
 
-    expect(tree).toHaveTextContent("v Parent;- Second Child;- Child;")
+    expect(tree).toHaveTextContent("v Parent;-- Second Child;-- Child;")
   })
 
   it("drags right to place a node as grandchild", () => {
@@ -565,6 +565,44 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent(
       "- First;-- Second;- Placeholder for Second;"
+    )
+  })
+
+  it("can unparent an second child by dragging left", () => {
+    const parent = buildKin({ id: "parent", order: 0.5, parentId: null })
+    const first = buildKin({ id: "first", order: 0.4, parentId: "parent" })
+    const second = buildKin({ id: "second", order: 0.6, parentId: "parent" })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree } = renderTree({
+      data: [first, second, parent],
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[2], {
+      clientX: 50,
+      clientY: 50,
+    })
+
+    fireEvent.mouseMove(rows[2], {
+      clientX: 10,
+      clientY: 50,
+    })
+
+    expect(tree).toHaveTextContent(
+      "v Parent;-- First;-- Second;- Placeholder for Second;"
     )
   })
 
