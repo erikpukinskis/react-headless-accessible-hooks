@@ -182,29 +182,47 @@ export function useOrderedTree<Datum>({
     bulkOrderRef.current(tree.missingOrdersById)
   }, [tree])
 
-  function getTreeProps() {
-    return {
-      role: "tree",
-      ref(node: HTMLElement) {
-        if (!node) {
-          model.setTreeBox(undefined)
-          return
-        }
-
-        const rect = node.getBoundingClientRect()
-
-        if (!rect.width) {
+  const observedNodeRef = useRef<HTMLElement | null>(null)
+  const [treeObserver] = useState(
+    () =>
+      new ResizeObserver(function updateTreeBox([{ contentRect }]) {
+        if (!contentRect.width) {
           model.setTreeBox(undefined)
           return
         }
 
         model.setTreeBox({
-          top: rect.top,
-          height: rect.height,
-          offsetLeft: node.offsetLeft,
-          offsetTop: node.offsetTop,
+          top: contentRect.top,
+          height: contentRect.height,
+          offsetLeft: contentRect.left,
+          offsetTop: contentRect.top,
         })
-      },
+      })
+  )
+
+  function callbackRef(element: HTMLElement | null) {
+    if (observedNodeRef.current && observedNodeRef.current === element) {
+      return
+    }
+
+    if (observedNodeRef.current && observedNodeRef.current !== element) {
+      treeObserver.unobserve(observedNodeRef.current)
+      observedNodeRef.current = null
+    }
+
+    if (!element) {
+      model.setTreeBox(undefined)
+      return
+    }
+
+    treeObserver.observe(element)
+    observedNodeRef.current = element
+  }
+
+  function getTreeProps() {
+    return {
+      role: "tree",
+      ref: callbackRef,
     }
   }
 

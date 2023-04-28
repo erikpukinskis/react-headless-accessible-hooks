@@ -671,6 +671,15 @@ describe("OrderedTree", () => {
       height: 20,
     })
 
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
+    })
+
     fireEvent.mouseDown(rows[0], {
       clientX: 10,
       clientY: 10,
@@ -680,8 +689,6 @@ describe("OrderedTree", () => {
       clientX: 10,
       clientY: 11,
     })
-
-    /// failing here, before the resize!
 
     expect(tree).toHaveTextContent(
       "> Placeholder for Parent;> Parent;- Second;"
