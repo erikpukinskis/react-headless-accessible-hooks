@@ -10,7 +10,7 @@ import {
 } from "react"
 import type { DatumFunctions, OrderedTreeNode } from "./buildTree"
 import { buildTree } from "./buildTree"
-import type { PlaceholderListener } from "./OrderedTreeModel"
+import type { NodeListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
 import { makeUninitializedContext } from "~/helpers"
@@ -151,7 +151,12 @@ export function useOrderedTree<Datum>({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => model.cleanup(), [])
 
-  const rootsWithPlaceholder = useChildData(tree.roots, null, model, false)
+  const { children: rootsWithPlaceholder } = useParent(
+    tree.roots,
+    null,
+    model,
+    false
+  )
 
   const isFirstRenderRef = useRef(true)
 
@@ -241,9 +246,18 @@ export function useOrderedTreeNode<Datum>(
   datum: Datum
 ): UseOrderedTreeNodeReturnType<Datum> {
   const model = useModel<Datum>()
+
   const node = model.getNode(datum)
+  const isBeingDragged = model.isBeingDragged(node.id)
   const isPlaceholder = model.isPlaceholder(datum)
-  const children = useChildData(node.children, node.id, model, isPlaceholder)
+  const childIsBeingDragged = model.childIsBeingDragged(node.id)
+
+  const { children, isExpanded, isCollapsed } = useParent(
+    node.children,
+    node.id,
+    model,
+    isPlaceholder
+  )
 
   const getNodeProps = useCallback<GetNodeProps>(() => {
     return {
@@ -259,81 +273,92 @@ export function useOrderedTreeNode<Datum>(
     ? model.getPlaceholderDepth()
     : node.parents.length
 
-  const childIsBeingDragged = model.childIsBeingDragged(node.id)
-
   const hasChildren =
     children.length > 1 || (children.length === 1 && !childIsBeingDragged)
 
   const getKey = useCallback((datum: Datum) => model.getKey(datum), [model])
 
   return {
-    children,
+    children: isCollapsed ? [] : children,
     getNodeProps,
     depth,
-    isBeingDragged: model.isBeingDragged(node.id),
-    isExpanded: model.isExpanded(node.id),
-    isCollapsed: model.isCollapsed(node.id),
-    isPlaceholder: model.isPlaceholder(datum),
+    isBeingDragged,
+    isExpanded,
+    isCollapsed,
+    isPlaceholder,
     hasChildren,
     getKey,
   }
 }
 
-function useChildData<Datum>(
-  children: OrderedTreeNode<Datum>[],
+type UseParentReturnType<Datum> = {
+  children: Datum[]
+  isCollapsed: boolean
+  isExpanded: boolean
+}
+
+/**
+ * Returns state regarding a node, specifically the state which can change
+ * during a drag.
+ *
+ * This includes the children, and whether a node is expanded or collapsed. A
+ * node can be collapsed if you start dragging it, and a node can become
+ * expanded if it has no children yet, and you drag another node under it as a
+ * new child.
+ */
+function useParent<Datum>(
+  childNodes: OrderedTreeNode<Datum>[],
   parentId: string | null,
   model: OrderedTreeModel<Datum>,
   isPlaceholder: boolean
-): Datum[] {
-  const [placeholderOrder, setPlaceholderOrder] = useState<number | undefined>(
-    undefined
+): UseParentReturnType<Datum> {
+  const [placeholderOrder, setPlaceholderOrder] = useState<number | null>(null)
+  const [isExpanded, setIsExpanded] = useState(
+    parentId !== null && model.isExpanded(parentId)
   )
 
   useEffect(() => {
     if (isPlaceholder) return
 
-    const handlePlaceholderChange: PlaceholderListener = (
-      isIncludedNow,
-      order
-    ) => {
-      setPlaceholderOrder(isIncludedNow ? order : undefined)
+    const handleNodeChange: NodeListener = () => {
+      if (parentId !== null) {
+        setIsExpanded(model.isExpanded(parentId))
+      }
+      setPlaceholderOrder(
+        model.isPlaceholderParent(parentId) ? model.getPlaceholderOrder() : null
+      )
     }
 
-    model.addPlaceholderListener(parentId, handlePlaceholderChange)
+    model.addPlaceholderListener(parentId, handleNodeChange)
 
     return () => {
-      model.removePlaceholderListener(parentId, handlePlaceholderChange)
+      model.removePlaceholderListener(parentId, handleNodeChange)
     }
   }, [model, parentId, isPlaceholder])
 
-  return useMemo(
+  const children = useMemo(
     function buildChildNodes(): Datum[] {
       if (isPlaceholder) return []
 
       if (!model.dragStart) {
-        return children.map((node) => node.data)
+        return childNodes.map((node) => node.data)
       }
 
-      if (placeholderOrder === undefined) {
-        return children.map((node) => node.data)
+      if (placeholderOrder === null) {
+        return childNodes.map((node) => node.data)
       }
 
-      // if (placeholderOrder === undefined) {
-      //   throw new Error(
-      //     "Do not have placeholder order, even though placeholder is included in these siblings"
-      //   )
-      // }
-
-      const placeholderDatum = model.getPlaceholderData()
+      const placeholderDatum = model.getPlaceholderDatum()
 
       if (!placeholderDatum) {
         throw new Error(
           "Could not get placeholder id, even though placeholder is included in these siblings"
         )
       }
+
       const data = splicePlaceholder(
-        children,
-        model.getPlaceholderData(),
+        childNodes,
+        model.getPlaceholderDatum(),
         placeholderOrder,
         model.getOrder.bind(model)
       )
@@ -342,8 +367,20 @@ function useChildData<Datum>(
 
       return data
     },
-    [model, children, placeholderOrder, isPlaceholder]
+    [model, childNodes, placeholderOrder, isPlaceholder]
   )
+
+  if (parentId === null) {
+    return { children, isCollapsed: false, isExpanded: false }
+  } else if (isPlaceholder || model.isBeingDragged(parentId)) {
+    return {
+      children: [],
+      isCollapsed: model.hasChildren(parentId),
+      isExpanded: false,
+    }
+  } else {
+    return { children, isCollapsed: model.isCollapsed(parentId), isExpanded }
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

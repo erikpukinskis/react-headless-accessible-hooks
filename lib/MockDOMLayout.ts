@@ -1,6 +1,9 @@
 import type React from "react"
 import type { SpyInstance } from "vitest"
 import { vi } from "vitest"
+import { mockDOMRect } from "./mockDOMRect"
+import { MockResizeObserver } from "./MockResizeObserver"
+import type { PartialResizeObserverEntry } from "./mockResizeObserverEntry"
 
 /**
  * Helper for mocking getBoundingClientRect in various conditions
@@ -9,17 +12,49 @@ export class MockDOMLayout {
   private getBoundingClientRectSpy?: SpyInstance
   private mocksByRole: Partial<Record<React.AriaRole, DOMRect>> = {}
   private elementMocks: SpyInstance[] = []
+  private originalResizeObserverConstructor: typeof ResizeObserver
+  private resizeObservers: MockResizeObserver[] = []
 
   /**
-   * Restore anything mocked by this MockDOMLayout
+   * Restore anything elements mocked by this MockDOMLayout, and clear all resize observers
    */
   cleanup: (this: void) => void
+  /**
+   * Restore all mocks
+   */
+  destroy: (this: void) => void
 
+  /**
+   * Mocks the global ResizeObserver constructor so that it returns a mock
+   * ResizeObserver that will call your callback when you call
+   * layout.resize(element, rect) below.
+   */
   constructor() {
-    this.cleanup = this.restoreMocks.bind(this)
+    this.originalResizeObserverConstructor = global.ResizeObserver
+
+    this.cleanup = () => {
+      this.restoreElementMocks()
+      this.clearObservers()
+    }
+
+    this.destroy = () => {
+      this.restoreElementMocks()
+      this.clearObservers()
+      this.restoreResizeObseverMock()
+    }
+
+    global.ResizeObserver = vi
+      .fn()
+      .mockImplementation(
+        (callback: ResizeObserverCallback): ResizeObserver => {
+          const observer = new MockResizeObserver(callback)
+          this.resizeObservers.push(observer)
+          return observer
+        }
+      )
   }
 
-  private restoreMocks() {
+  private restoreElementMocks() {
     this.getBoundingClientRectSpy?.mockRestore()
 
     delete this.getBoundingClientRectSpy
@@ -29,6 +64,14 @@ export class MockDOMLayout {
     }
 
     this.elementMocks = []
+  }
+
+  private clearObservers() {
+    this.resizeObservers = []
+  }
+
+  private restoreResizeObseverMock() {
+    global.ResizeObserver = this.originalResizeObserverConstructor
   }
 
   private getBoundingClientRect(element: Element) {
@@ -115,15 +158,36 @@ export class MockDOMLayout {
         return layout.getBoundingClientRect(element)
       })
   }
+
+  resize(target: Element, entry: PartialResizeObserverEntry) {
+    if (!global.ResizeObserver) {
+      throw new Error(
+        "Tried to fire a resize event after MockDomLayout had already been destroyed"
+      )
+    }
+
+    const observersThatFired = this.resizeObservers.filter((observer) => {
+      return observer.resize(target, [entry])
+    })
+
+    if (observersThatFired.length < 1) {
+      throw new Error(
+        `Tried to fire a resize on element ${describeElement(
+          target
+        )} but no observers were observing it`
+      )
+    }
+  }
 }
 
-function mockDOMRect(overrides: Partial<DOMRect>) {
-  return new Proxy({} as DOMRect, {
-    get(_, prop: keyof DOMRect) {
-      if (prop in overrides) return overrides[prop]
-      throw new Error(
-        `${prop} not implemented in your mockDomRect. Try mockDomRect({ ${prop}: ... })`
-      )
-    },
-  })
+function describeElement(element: Element) {
+  const tag = element.tagName
+
+  if (element.id) {
+    return `${tag}#${element.id}`
+  } else if (element.classList.length > 0) {
+    return `${tag}.${Array.from(element.classList).join(".")}`
+  } else {
+    return tag
+  }
 }

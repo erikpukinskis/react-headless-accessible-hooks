@@ -2,7 +2,7 @@ import { render, fireEvent, cleanup } from "@testing-library/react"
 import produce from "immer"
 import { startCase } from "lodash"
 import React, { Profiler, useState } from "react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import type { DatumFunctions, UseOrderedTreeArgs } from "./useOrderedTree"
 import { MockDOMLayout } from "~/testHelpers"
@@ -13,6 +13,8 @@ describe("OrderedTree", () => {
   afterEach(cleanup)
 
   afterEach(layout.cleanup)
+
+  afterAll(layout.destroy)
 
   it("swaps two nodes", () => {
     const moveNode = vi.fn()
@@ -645,6 +647,82 @@ describe("OrderedTree", () => {
       "- Daughter;v Momma;-- Placeholder for Daughter;-- Kiddo;"
     )
   })
+
+  it.only("collapses nodes while dragging them", () => {
+    const parent = buildKin({ id: "parent", order: 0.5, parentId: null })
+    const first = buildKin({ id: "first", order: 0.4, parentId: "parent" })
+    const second = buildKin({ id: "second", order: 0.6, parentId: null })
+
+    layout.mockRoleBoundingRects("tree", {
+      width: 200,
+      height: 60,
+      left: 0,
+      top: 0,
+    })
+
+    const { rows, tree, result } = renderTree({
+      data: [first, second, parent],
+    })
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[0], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    fireEvent.mouseMove(rows[0], {
+      clientX: 10,
+      clientY: 11,
+    })
+
+    /// failing here, before the resize!
+
+    expect(tree).toHaveTextContent(
+      "> Placeholder for Parent;> Parent;- Second;"
+    )
+
+    return
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 40,
+        left: 0,
+        top: 0,
+      },
+    })
+
+    const rowsDuringDrag = result.getAllByRole("treeitem")
+
+    layout.mockListBoundingRects(rowsDuringDrag, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseMove(rows[0], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent(
+      "> Parent;- Second;> Placeholder for Parent;"
+    )
+
+    fireEvent.mouseUp(rows[0], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    expect(tree).toHaveTextContent("- Second;v Parent;-- First;")
+  })
 })
 
 /**
@@ -700,7 +778,7 @@ function renderTree({ onMount, ...props }: RenderTreeArgs) {
   const rows = result.queryAllByRole("treeitem")
   const tree = result.getByRole("tree")
 
-  return { rows, tree, dump: () => console.log(result.debug()) }
+  return { rows, tree, dump: () => console.log(result.debug()), result }
 }
 
 /**

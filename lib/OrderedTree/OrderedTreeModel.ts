@@ -39,9 +39,8 @@ export class OrderedTreeModel<Datum> {
   tree: OrderedTreeBuild<Datum>
   treeBox?: TreeBox
   dump: DebugDataDumper
-  dragChildListenersById: Partial<
-    Record<string | typeof NoParent, PlaceholderListener>
-  > = {}
+  nodeListenersById: Partial<Record<string | typeof NoParent, NodeListener>> =
+    {}
   moveNode: MoveNodeHandler
 
   constructor({
@@ -104,12 +103,16 @@ export class OrderedTreeModel<Datum> {
     return this.dragEnd.newDepth
   }
 
-  getPlaceholderData(): Datum {
+  getPlaceholderDatum(): Datum {
     if (!this.dragStart) {
       throw new Error("Can not get placeholder data when not dragging")
     }
 
     return this.dragStart.placeholderDatum
+  }
+
+  isPlaceholderParent(id: string | null) {
+    return this.dragEnd?.parentId === id
   }
 
   getPlaceholderOrder(): number {
@@ -135,11 +138,22 @@ export class OrderedTreeModel<Datum> {
     return key
   }
 
-  /**
-   * Collapsed nodes won't have any children (even though there technically the
-   * children are just hidden) so determininh whether a node is expanded is just
-   * a question of whether there are any visible children.
-   */
+  isCollapsed(id: string): boolean {
+    const node = this.tree.nodesById[id]
+
+    const isPlaceholder = this.isPlaceholder(node.data) /// FIXME Is there even a node for the placeholder? I don't thinks so.
+
+    const hasChildren = node.children.length > 0
+
+    // A node may be collapsed if it is the one we're dragging
+    if (isPlaceholder && hasChildren) {
+      return true
+    }
+
+    // Otherwise it may have been collapsed by the user
+    return node.isCollapsed
+  }
+
   isExpanded(id: string): boolean {
     const node = this.tree.nodesById[id]
 
@@ -169,11 +183,6 @@ export class OrderedTreeModel<Datum> {
     // Finally, we know there is only one child, but it may or may not have been
     // dragged out.
     return node.children[0].id !== this.dragStart?.node.id
-  }
-
-  isCollapsed(id: string): boolean {
-    const node = this.tree.nodesById[id]
-    return node.isCollapsed
   }
 
   isLastChild(id: string): boolean {
@@ -209,6 +218,10 @@ export class OrderedTreeModel<Datum> {
     return parentId === dragNodeParentId
   }
 
+  hasChildren(parentId: string) {
+    return this.tree.nodesById[parentId].children.length > 0
+  }
+
   /**
    * Updates CSS positioning styles on the element being dragged
    */
@@ -241,36 +254,26 @@ export class OrderedTreeModel<Datum> {
    * a listener for that node. As the mouse moves, if we determine that node's
    * children change we call the listener and that triggers a re-render.
    */
-  addPlaceholderListener(nodeId: string | null, listener: PlaceholderListener) {
-    this.dragChildListenersById[nodeId ?? NoParent] = listener
+  addPlaceholderListener(nodeId: string | null, listener: NodeListener) {
+    this.nodeListenersById[nodeId ?? NoParent] = listener
   }
 
   /**
    * Notify a node that the drag child either just left their children, or is
    * just arriving into their children.
    */
-  notifyNodeOfPlaceholderChange(
-    nodeId: string | null,
-    draggedIntoChildren: boolean,
-    order: number | undefined
-  ) {
-    this.dragChildListenersById[nodeId ?? NoParent]?.(
-      draggedIntoChildren,
-      order
-    )
+  notifyNodeOfChange(nodeId: string | null) {
+    this.nodeListenersById[nodeId ?? NoParent]?.()
   }
 
   /**
    * On unmount, `useOrderedTreeChildNodes` removes its listener.
    */
-  removePlaceholderListener(
-    nodeId: string | null,
-    listener: PlaceholderListener
-  ) {
-    if (this.dragChildListenersById[nodeId ?? NoParent] !== listener) {
+  removePlaceholderListener(nodeId: string | null, listener: NodeListener) {
+    if (this.nodeListenersById[nodeId ?? NoParent] !== listener) {
       return
     }
-    delete this.dragChildListenersById[nodeId ?? NoParent]
+    delete this.nodeListenersById[nodeId ?? NoParent]
   }
 
   /**
@@ -291,11 +294,10 @@ export class OrderedTreeModel<Datum> {
     this.dump("clientX", this.clientX)
     this.dump("clientY", this.clientY)
 
-    // if (isDropping) {
-    //   return
-    // }
-
-    if (!this.dragStart) return
+    if (!this.dragStart) {
+      // throw new Error("No dragStart but we received a mouse move")
+      return
+    }
 
     this.updateDragElementPosition()
 
@@ -394,6 +396,10 @@ export class OrderedTreeModel<Datum> {
     const oldParentId = this.dragEnd?.parentId
     const oldOrder = this.dragEnd?.order
 
+    if (!this.dragEnd && this.dragStart.node.children.length > 0) {
+      this.notifyNodeOfChange(this.dragStart.node.id)
+    }
+
     this.dragEnd = newDrag
 
     // If there was already a dragEnd previously, there will be an oldParentId
@@ -402,7 +408,7 @@ export class OrderedTreeModel<Datum> {
     // newParentId is different. In that case the order (within that old parent)
     // can be undefined.
     if (oldParentId !== undefined && oldParentId !== newParentId) {
-      this.notifyNodeOfPlaceholderChange(oldParentId, false, undefined)
+      this.notifyNodeOfChange(oldParentId)
     }
 
     // If there is a new parent, we need to tell that parent they have the
@@ -412,7 +418,7 @@ export class OrderedTreeModel<Datum> {
       newParentId !== undefined &&
       (newParentId !== oldParentId || newOrder !== oldOrder)
     ) {
-      this.notifyNodeOfPlaceholderChange(newParentId, true, newOrder)
+      this.notifyNodeOfChange(newParentId)
     }
   }
 
@@ -473,7 +479,8 @@ export class OrderedTreeModel<Datum> {
     }
 
     if (dragEnd.parentId !== undefined) {
-      this.notifyNodeOfPlaceholderChange(dragEnd.parentId, false, undefined)
+      this.notifyNodeOfChange(dragEnd.parentId)
+      this.notifyNodeOfChange(dragStart.node.id)
       this.moveNode(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
 
@@ -528,10 +535,7 @@ export type DragEnd = {
   newDepth: number
 }
 
-export type PlaceholderListener = (
-  placeholderIsIncluded: boolean,
-  order: number | undefined
-) => void
+export type NodeListener = () => void
 
 const NoParent = Symbol("NoParent")
 

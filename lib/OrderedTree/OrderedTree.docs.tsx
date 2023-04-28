@@ -219,7 +219,7 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     depth,
     isPlaceholder,
     isBeingDragged,
-    hasChildren,
+    isExpanded,
     isCollapsed,
     getKey,
   } = useOrderedTreeNode(kin)
@@ -230,8 +230,8 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
         <DepthIndicator
           id={kin.id}
           depth={depth}
-          isCollapsed={false}
-          hasChildren={false}
+          isCollapsed={isCollapsed}
+          isExpanded={isExpanded}
         />
         <PlaceholderShadow>{kin.name}</PlaceholderShadow>
       </Placeholder>
@@ -246,10 +246,12 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
             id={kin.id}
             depth={depth}
             isCollapsed={isCollapsed}
-            hasChildren={hasChildren}
+            isExpanded={isExpanded}
           />
         )}
-        <span style={hasChildren ? { fontWeight: 500 } : undefined}>
+        <span
+          style={isExpanded || isCollapsed ? { fontWeight: 500 } : undefined}
+        >
           {kin.name}
         </span>
       </DraggableRow>
@@ -269,14 +271,14 @@ type DepthIndicatorProps = {
   id: string
   depth: number
   isCollapsed: boolean
-  hasChildren: boolean
+  isExpanded: boolean
 }
 
 const DepthIndicator = ({
   id,
   depth,
   isCollapsed,
-  hasChildren,
+  isExpanded,
 }: DepthIndicatorProps) => {
   const emptyArray = Array(depth) as unknown[]
   const stars = [...emptyArray].map((_, i) => (
@@ -292,7 +294,7 @@ const DepthIndicator = ({
       {BLACK_RIGHT_POINTING_TRIANGLE}
       {SPACE}
     </>
-  ) : hasChildren ? (
+  ) : isExpanded ? (
     <>
       {stars}
       {BLACK_DOWN_POINTING_TRIANGLE}
