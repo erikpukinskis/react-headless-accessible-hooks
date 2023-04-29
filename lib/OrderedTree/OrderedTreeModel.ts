@@ -4,7 +4,10 @@ import type {
   OrderedTreeBuild,
   OrderedTreeNode,
 } from "./buildTree"
-import { placeWithinSiblings } from "./buildTree"
+import {
+  buildTreeIndexesWithNodeCollapsed,
+  placeWithinSiblings,
+} from "./buildTree"
 import { getDrag } from "./drag"
 import type { DebugDataDumper } from "~/Debug"
 import { assert } from "~/helpers"
@@ -16,6 +19,7 @@ type OrderedTreeModelArgs<Datum> = {
   getParentId: DatumFunctions<Datum>["getParentId"]
   getOrder: DatumFunctions<Datum>["getOrder"]
   getId: DatumFunctions<Datum>["getId"]
+  isCollapsed: DatumFunctions<Datum>["isCollapsed"]
 
   // Other
   dump?: DebugDataDumper
@@ -33,9 +37,10 @@ export class OrderedTreeModel<Datum> {
   clientY = NaN
   dragStart?: DragStart<Datum>
   dragEnd?: DragEnd
-  getParentId: DatumFunctions<Datum>["getParentId"]
-  getDatumOrder: DatumFunctions<Datum>["getOrder"]
-  getId: DatumFunctions<Datum>["getId"]
+  data: Pick<
+    DatumFunctions<Datum>,
+    "getParentId" | "getOrder" | "getId" | "isCollapsed"
+  >
   tree: OrderedTreeBuild<Datum>
   treeBox?: TreeBox
   dump: DebugDataDumper
@@ -48,13 +53,12 @@ export class OrderedTreeModel<Datum> {
     getParentId,
     getOrder,
     getId,
+    isCollapsed,
     dump,
     moveNode,
   }: OrderedTreeModelArgs<Datum>) {
     this.tree = tree
-    this.getParentId = getParentId
-    this.getDatumOrder = getOrder
-    this.getId = getId
+    this.data = { getParentId, getOrder, getId, isCollapsed }
     this.dump = dump ?? noop
     this.moveNode = moveNode
   }
@@ -79,13 +83,60 @@ export class OrderedTreeModel<Datum> {
   }
 
   getNode(datum: Datum) {
-    return this.tree.nodesById[this.getId(datum)]
+    return this.tree.nodesById[this.data.getId(datum)]
   }
 
+  getIndexes() {
+    if (
+      !this.dragStart ||
+      this.nodeIsCollapsed(this.dragStart.node.id) ||
+      this.dragStart.node.children.length === 0
+    ) {
+      // Unless we collapsed the drag node, we can just use the already built indexes
+      const { nodesByIndex, indexesById } = this.tree
+
+      return { nodesByIndex, indexesById }
+    }
+
+    if (this.dragStart.nodesByIndex && this.dragStart.indexesById) {
+      const { nodesByIndex, indexesById } = this.dragStart
+
+      return { nodesByIndex, indexesById }
+    }
+
+    // If we get here, we _did_ collapse the drag node, and we need to generate
+    // a new nodesByIndex without that node's children.
+
+    const { nodesByIndex, indexesById } = buildTreeIndexesWithNodeCollapsed(
+      this.tree,
+      this.dragStart.node
+    )
+
+    this.dragStart.nodesByIndex = nodesByIndex
+    this.dragStart.indexesById = indexesById
+
+    return { nodesByIndex, indexesById }
+  }
+
+  getIndex(id: string) {
+    const { indexesById } = this.getIndexes()
+
+    const index = indexesById[id]
+
+    if (index === undefined) {
+      throw new Error(`No index for node ${id}`)
+    }
+
+    return index
+  }
+
+  // getOrder is slightly different than some of the other datum functions
+  // because we infill missing orders during tree build. So this value could
+  // come from the datum or it could come from tree.missingOrdersById.
   getOrder(datum: Datum) {
     return (
-      this.getDatumOrder(datum) ??
-      this.tree.missingOrdersById[this.getId(datum)]
+      this.data.getOrder(datum) ??
+      this.tree.missingOrdersById[this.data.getId(datum)]
     )
   }
 
@@ -127,18 +178,18 @@ export class OrderedTreeModel<Datum> {
     let key: string
 
     if (datum === this.dragStart?.placeholderDatum) {
-      const placeholderId = this.getId(this.dragStart.placeholderDatum)
+      const placeholderId = this.data.getId(this.dragStart.placeholderDatum)
 
       key = `placeholder-node-${placeholderId}`
     } else {
-      const id = this.getId(datum)
+      const id = this.data.getId(datum)
       key = `ordered-node-${id}`
     }
 
     return key
   }
 
-  isCollapsed(id: string): boolean {
+  nodeIsCollapsed(id: string): boolean {
     const node = this.tree.nodesById[id]
 
     const isPlaceholder = this.isPlaceholder(node.data) /// FIXME Is there even a node for the placeholder? I don't thinks so.
@@ -151,7 +202,7 @@ export class OrderedTreeModel<Datum> {
     }
 
     // Otherwise it may have been collapsed by the user
-    return node.isCollapsed
+    return this.data.isCollapsed(node.data)
   }
 
   isExpanded(id: string): boolean {
@@ -213,7 +264,7 @@ export class OrderedTreeModel<Datum> {
   childIsBeingDragged(parentId: string) {
     if (!this.dragStart) return false
 
-    const dragNodeParentId = this.getParentId(this.dragStart.node.data)
+    const dragNodeParentId = this.data.getParentId(this.dragStart.node.data)
 
     return parentId === dragNodeParentId
   }
@@ -231,8 +282,8 @@ export class OrderedTreeModel<Datum> {
     const dx = this.clientX - this.dragStart.clientX
     const dy = this.clientY - this.dragStart.clientY
     const rowHeight = this.dragStart.treeBox.height / this.tree.treeSize
-    const rowTop =
-      this.dragStart.treeBox.offsetTop + this.dragStart.node.index * rowHeight
+    const index = this.getIndex(this.dragStart.node.id)
+    const rowTop = this.dragStart.treeBox.offsetTop + index * rowHeight
 
     const left = `${(this.dragStart.treeBox.offsetLeft + dx).toFixed(1)}px`
     const top = `${(rowTop + dy).toFixed(1)}px`
@@ -308,15 +359,17 @@ export class OrderedTreeModel<Datum> {
     const dx = this.clientX - this.dragStart.clientX
     const dy = this.clientY - this.dragStart.clientY
 
-    const dragData = getDrag(
-      this.tree.nodesByIndex,
-      this.dragStart.node.index,
+    const { nodesByIndex } = this.getIndexes()
+
+    const dragData = getDrag({
+      nodesByIndex,
+      downIndex: this.getIndex(this.dragStart.node.id),
       hoverIndex,
       dx,
       dy,
-      this.isCollapsed.bind(this),
-      this.isLastChild.bind(this)
-    )
+      isCollapsed: this.nodeIsCollapsed.bind(this),
+      isLastChild: this.isLastChild.bind(this),
+    })
 
     const { relativeTo } = dragData
 
@@ -339,7 +392,7 @@ export class OrderedTreeModel<Datum> {
 
     if (dragData.move === "nowhere") {
       newOrder = assert(this.dragStart.originalOrder, "No original order")
-      newParentId = this.getParentId(this.dragStart.node.data)
+      newParentId = this.data.getParentId(this.dragStart.node.data)
       newDepth = this.dragStart.node.parents.length
     } else if (dragData.relativeTo === undefined) {
       throw new Error(
@@ -352,7 +405,7 @@ export class OrderedTreeModel<Datum> {
         siblings: dragData.relativeTo.children,
         missingOrdersById: this.tree.missingOrdersById,
         getOrder: this.getOrder.bind(this),
-        getId: this.getId,
+        getId: this.data.getId,
       })
 
       newParentId = dragData.relativeTo.id
@@ -367,7 +420,7 @@ export class OrderedTreeModel<Datum> {
         siblings,
         missingOrdersById: this.tree.missingOrdersById,
         getOrder: this.getOrder.bind(this),
-        getId: this.getId,
+        getId: this.data.getId,
       })
 
       newParentId = newParent?.id ?? null
@@ -445,7 +498,7 @@ export class OrderedTreeModel<Datum> {
     element.style.height = `${rect.height}px`
     element.style.boxSizing = "border-box"
 
-    const node = this.tree.nodesById[this.getId(datum)]
+    const node = this.tree.nodesById[this.data.getId(datum)]
 
     this.dragStart = {
       node,
@@ -489,7 +542,7 @@ export class OrderedTreeModel<Datum> {
 
     if (isLackingPrecision(dragEnd.order)) {
       throw new Error(
-        `Hit the minimum precision on a tree node order (on id ${this.getId(
+        `Hit the minimum precision on a tree node order (on id ${this.data.getId(
           dragStart.node.data
         )}). We should defragment here, but RHAH doesn't support that yet`
       )
@@ -499,6 +552,8 @@ export class OrderedTreeModel<Datum> {
 
 type DragStart<Datum> = {
   node: OrderedTreeNode<Datum>
+  nodesByIndex?: Record<number, OrderedTreeNode<Datum>>
+  indexesById?: Record<string, number>
   placeholderDatum: Datum
   element: HTMLElement
   clientX: number

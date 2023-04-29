@@ -128,6 +128,7 @@ export function useOrderedTree<Datum>({
         getParentId,
         getOrder,
         getId,
+        isCollapsed,
         dump,
         moveNode: onNodeMove,
         collapseNode: () => {},
@@ -397,7 +398,11 @@ function useParent<Datum>(
       isExpanded: false,
     }
   } else {
-    return { children, isCollapsed: model.isCollapsed(parentId), isExpanded }
+    return {
+      children,
+      isCollapsed: model.nodeIsCollapsed(parentId),
+      isExpanded,
+    }
   }
 }
 

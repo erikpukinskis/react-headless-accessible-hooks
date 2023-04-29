@@ -17,6 +17,7 @@ export type OrderedTreeBuild<Datum> = {
   missingOrdersById: Record<string, number>
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   nodesById: Record<string, OrderedTreeNode<Datum>>
+  indexesById: Record<string, number>
 }
 
 type buildTreeArgs<Datum> = DatumFunctions<Datum> & {
@@ -32,6 +33,7 @@ export function buildTree<Datum>({
   const rootData = data.filter((datum) => !datumFunctions.getParentId(datum))
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
   const nodesById: Record<string, OrderedTreeNode<Datum>> = {}
+  const indexesById: Record<string, number> = {}
 
   if (data.length > 0 && rootData.length < 1) {
     if (import.meta.env.MODE !== "test") {
@@ -56,6 +58,7 @@ export function buildTree<Datum>({
     nextIndex: 0,
     nodesByIndex,
     nodesById,
+    indexesById,
     parents: [],
   })
 
@@ -66,6 +69,7 @@ export function buildTree<Datum>({
     treeSize: nextIndex,
     nodesByIndex,
     nodesById,
+    indexesById,
   }
 
   return build
@@ -76,8 +80,6 @@ export type OrderedTreeNode<Datum> = {
   data: Datum
   children: OrderedTreeNode<Datum>[]
   parents: OrderedTreeNode<Datum>[]
-  index: number
-  isCollapsed: boolean
 }
 
 type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
@@ -86,6 +88,7 @@ type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
   nextIndex: number
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   nodesById: Record<string, OrderedTreeNode<Datum>>
+  indexesById: Record<string, number>
   parents: OrderedTreeNode<Datum>[]
 }
 
@@ -99,6 +102,7 @@ function buildSiblingNodes<Datum>({
   isCollapsed,
   nextIndex,
   nodesByIndex,
+  indexesById,
   nodesById,
   parents,
 }: BuildNodesArgs<Datum>) {
@@ -130,8 +134,6 @@ function buildSiblingNodes<Datum>({
       data: datum,
       children: [] as OrderedTreeNode<Datum>[],
       parents: parents,
-      index: nodeIndex,
-      isCollapsed: childData.length > 0 && isCollapsed(datum),
     }
 
     if (childData.length > 0 && !isCollapsed(datum)) {
@@ -150,6 +152,7 @@ function buildSiblingNodes<Datum>({
         nextIndex,
         nodesByIndex,
         nodesById,
+        indexesById,
         parents: [node, ...parents],
       })
 
@@ -163,6 +166,7 @@ function buildSiblingNodes<Datum>({
 
     nodesByIndex[nodeIndex] = node
     nodesById[id] = node
+    indexesById[id] = nodeIndex
 
     return node
   })
@@ -313,4 +317,26 @@ export function placeWithinSiblings<Datum>({
   } else {
     throw new Error(`Bad direction ${direction as string}`)
   }
+}
+
+export function buildTreeIndexesWithNodeCollapsed<Datum>(
+  tree: OrderedTreeBuild<Datum>,
+  node: OrderedTreeNode<Datum>
+) {
+  const spliceStart = tree.indexesById[node.id] + 1
+  const spliceLength = node.children.length
+
+  const newNodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
+  const newIndexesById: Record<string, number> = {}
+
+  for (let newIndex = 0; newIndex < tree.treeSize - spliceLength; newIndex++) {
+    const treeIndex =
+      newIndex < spliceStart ? newIndex : newIndex + spliceLength
+    const node = tree.nodesByIndex[treeIndex]
+
+    newNodesByIndex[newIndex] = node
+    newIndexesById[node.id] = newIndex
+  }
+
+  return { nodesByIndex: newNodesByIndex, indexesById: newIndexesById }
 }

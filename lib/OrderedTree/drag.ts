@@ -18,15 +18,31 @@ export type DragData<Datum> = {
   hoverNode?: OrderedTreeNode<Datum>
 }
 
-export function getDrag<Datum>(
-  nodesByIndex: Record<number, OrderedTreeNode<Datum>>,
-  downRowIndex: number | undefined,
-  hoverIndex: number,
-  dx: number | undefined,
-  dy: number | undefined,
-  isCollapsed: (id: string) => boolean,
+type GetDragArgs<Datum> = {
+  nodesByIndex: Record<number, OrderedTreeNode<Datum>>
+  downIndex: number
+  hoverIndex: number
+  dx?: number
+  dy?: number
+  isCollapsed: (id: string) => boolean
   isLastChild: (id: string) => boolean
-): DragData<Datum> {
+}
+
+export function getDrag<Datum>({
+  nodesByIndex,
+  downIndex,
+  hoverIndex,
+  dx,
+  dy,
+  isCollapsed,
+  isLastChild,
+}: GetDragArgs<Datum>): DragData<Datum> {
+  if (downIndex == null) {
+    throw new Error(
+      `getDrag requires a downIndex, you passed ${JSON.stringify(downIndex)}`
+    )
+  }
+
   if (dx === 0 && dy === 0) {
     return {
       dragging: false,
@@ -36,7 +52,7 @@ export function getDrag<Datum>(
     }
   }
 
-  const dragging = hoverIndex != null && downRowIndex != null
+  const dragging = hoverIndex != null && downIndex != null
 
   const data: DragData<Datum> = {
     dragging,
@@ -53,8 +69,8 @@ export function getDrag<Datum>(
 
   const dragDirection = (() => {
     if (!dragging) return "nowhere"
-    else if (hoverIndex === downRowIndex) return "nowhere"
-    else if (hoverIndex < downRowIndex) return "up"
+    else if (hoverIndex === downIndex) return "nowhere"
+    else if (hoverIndex < downIndex) return "up"
     else return "down"
   })()
 
@@ -62,9 +78,9 @@ export function getDrag<Datum>(
 
   data.hoverDepth = hoverNode.parents.length
 
-  if (downRowIndex == null || dx == null) return data
+  if (dx == null) return data
 
-  const downNode = nodesByIndex[downRowIndex]
+  const downNode = nodesByIndex[downIndex]
 
   data.downNode = downNode
 

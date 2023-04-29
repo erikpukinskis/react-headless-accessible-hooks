@@ -648,11 +648,14 @@ describe("OrderedTree", () => {
     )
   })
 
-  it.only("collapses nodes while dragging them", () => {
+  it("collapses nodes while dragging them", () => {
     const parent = buildKin({ id: "parent", order: 0.5, parentId: null })
     const first = buildKin({ id: "first", order: 0.4, parentId: "parent" })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
 
+    /// Todo: this probably should be unnecessary since we're firing a resize
+    /// below. Maybe instead of "mock" we can just describe all these APIs in
+    /// terms of "resize"? Maybe "presize"? "layout.presizeByRole"?
     layout.mockRoleBoundingRects("tree", {
       width: 200,
       height: 60,

@@ -18,12 +18,6 @@ function buildNode({
     children,
     parents,
     data: false,
-    isLastChild: true,
-    order: 0.5,
-    isCollapsed: false,
-    index: 0,
-    key: id,
-    isPlaceholder: false,
   }
 }
 

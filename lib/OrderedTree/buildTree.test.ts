@@ -1,7 +1,11 @@
 import { cloneDeep } from "lodash"
 import { describe, it, expect } from "vitest"
 import type { DatumFunctions } from "./buildTree"
-import { buildTree, placeWithinSiblings } from "./buildTree"
+import {
+  buildTreeIndexesWithNodeCollapsed,
+  buildTree,
+  placeWithinSiblings,
+} from "./buildTree"
 
 type Kin = {
   id: string
@@ -96,55 +100,58 @@ describe("buildTree", () => {
   })
 
   it("should add indexes for needs within the full tree", () => {
-    const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
+    const { roots, indexesById } = buildTree({
+      data: cloneDeep(DATA),
+      ...FUNCTIONS,
+    })
 
     expect(roots[0].data.name).toBe("gramps")
-    expect(roots[0].index).toBe(0)
+    expect(indexesById["gramps"]).toBe(0)
 
     expect(roots[0].children[0].data.name).toBe("momma")
-    expect(roots[0].children[0].index).toBe(1)
+    expect(indexesById["momma"]).toBe(1)
 
     expect(roots[0].children[0].children[0].data.name).toBe("grandkid")
-    expect(roots[0].children[0].children[0].index).toBe(2)
+    expect(indexesById["grandkid"]).toBe(2)
 
     expect(roots[0].children[1].data.name).toBe("auntie")
-    expect(roots[0].children[1].index).toBe(3)
+    expect(indexesById["auntie"]).toBe(3)
   })
 
   it("should list need parents", () => {
-    const { roots } = buildTree({ data: cloneDeep(DATA), ...FUNCTIONS })
+    const { roots, indexesById } = buildTree({
+      data: cloneDeep(DATA),
+      ...FUNCTIONS,
+    })
 
     expect(roots[0].data.name).toBe("gramps")
-    expect(roots[0].index).toBe(0)
+    expect(indexesById["gramps"]).toBe(0)
 
     expect(roots[0].children[0].data.name).toBe("momma")
-    expect(roots[0].children[0].index).toBe(1)
+    expect(indexesById["momma"]).toBe(1)
 
     expect(roots[0].children[0].children[0].data.name).toBe("grandkid")
-    expect(roots[0].children[0].children[0].index).toBe(2)
+    expect(indexesById["grandkid"]).toBe(2)
 
     expect(roots[0].children[1].data.name).toBe("auntie")
-    expect(roots[0].children[1].index).toBe(3)
+    expect(indexesById["auntie"]).toBe(3)
   })
 
   it("should ignore collapsed needs when generating the indexes", () => {
     const collapsedMomma: Kin = { ...momma, isCollapsed: true }
     const data = cloneDeep([auntie, grandkid, collapsedMomma, gramps])
-    const { roots } = buildTree({ data, ...FUNCTIONS })
+    const { roots, indexesById } = buildTree({ data, ...FUNCTIONS })
 
     expect(roots[0].data.name).toBe("gramps")
     expect(roots[0].children).toHaveLength(2)
-    expect(roots[0].index).toBe(0)
-    expect(roots[0].isCollapsed).toBe(false)
+    expect(indexesById["gramps"]).toBe(0)
 
     expect(roots[0].children[0].data.name).toBe("momma")
-    expect(roots[0].children[0].index).toBe(1)
+    expect(indexesById["momma"]).toBe(1)
     expect(roots[0].children[0].children).toHaveLength(0) // no subneeds if collapsed!
-    expect(roots[0].children[0].isCollapsed).toBe(true)
 
     expect(roots[0].children[1].data.name).toBe("auntie")
-    expect(roots[0].children[1].index).toBe(2)
-    expect(roots[0].children[1].isCollapsed).toBe(false)
+    expect(indexesById["auntie"]).toBe(2)
   })
 
   it("should provide updates for all needs", () => {
@@ -268,5 +275,48 @@ describe("buildTree", () => {
     expect(() => {
       buildTree({ data: [AUNTIE, MOMMA, GRANDKID], ...FUNCTIONS })
     }).toThrow("Every node in the tree had a parent")
+  })
+
+  it("rebuilds indexes with a node collapsed", () => {
+    const parent: Kin = {
+      id: "parent",
+      createdAt: "2022-01-02",
+      name: "Parent",
+      parentId: null,
+      order: 0.5,
+      isCollapsed: false,
+    }
+
+    const child: Kin = {
+      id: "child",
+      createdAt: "2022-01-02",
+      name: "Child",
+      parentId: "parent",
+      order: 0.4,
+      isCollapsed: false,
+    }
+
+    const peer: Kin = {
+      id: "peer",
+      createdAt: "2022-01-02",
+      name: "Peer",
+      parentId: null,
+      order: 0.6,
+      isCollapsed: false,
+    }
+
+    const tree = buildTree({
+      data: [parent, child, peer],
+      ...FUNCTIONS,
+    })
+
+    const nodeToCollapse = tree.nodesById["parent"]
+
+    const indexes = buildTreeIndexesWithNodeCollapsed(tree, nodeToCollapse)
+
+    expect(indexes.indexesById).toMatchObject({
+      parent: 0,
+      peer: 1,
+    })
   })
 })

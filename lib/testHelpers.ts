@@ -1,1 +1,1 @@
-export * from "./MockDomLayout"
+export * from "./MockDOMLayout"
