@@ -690,8 +690,6 @@ describe("OrderedTree", () => {
       clientY: 11,
     })
 
-    return
-
     expect(tree).toHaveTextContent(
       "> Placeholder for Parent;> Parent;- Second;"
     )

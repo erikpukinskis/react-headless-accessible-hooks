@@ -3,46 +3,50 @@ import type { PartialResizeObserverEntry } from "./mockResizeObserverEntry"
 import { mockResizeObserverEntry } from "./mockResizeObserverEntry"
 
 export class MockResizeObserver implements ResizeObserver {
-  private resizeCallbacksByElementIndex: Record<
-    number,
-    ResizeObserverCallback[]
-  > = {}
-
   private observedElements: (Element | null)[] = []
   private callback: ResizeObserverCallback
   private connected = true
+  private onDisconnect: (observer: MockResizeObserver) => void
 
-  constructor(callback: ResizeObserverCallback) {
+  constructor(
+    callback: ResizeObserverCallback,
+    onDisconnect: (observer: MockResizeObserver) => void
+  ) {
     this.callback = callback
+    this.onDisconnect = onDisconnect
   }
 
   observe(target: Element) {
+    if (!this.connected) {
+      throw new Error(
+        `Tried to use disconnected ResizeObserver to observe ${describeElement(
+          target
+        )}`
+      )
+    }
+
     if (this.observedElements.includes(target)) {
-      // See note below about being liberal throwing errors
+      // See note below about being "more liberal throwing errors"
       throw new Error(`Already observing ${describeElement(target)}`)
     }
 
-    // We keep track of elements by index. On observe we add the observed
-    // element to our list. Then when we fire a layout.resize event on a given
-    // element in our test, we look up that element in our index, and use that
-    // to find any resize callbacks that need to be called.
-    const index = this.observedElements.push(target) - 1
-
-    let callbacks = this.resizeCallbacksByElementIndex[index]
-
-    if (!callbacks) {
-      callbacks = this.resizeCallbacksByElementIndex[index] = []
-    }
-
-    callbacks.push(this.callback)
+    this.observedElements.push(target)
   }
 
   unobserve(target: Element) {
+    if (!this.connected) {
+      throw new Error(
+        `Tried to use disconnected ResizeObserver to unobserve ${describeElement(
+          target
+        )}`
+      )
+    }
+
     const elementIndex = this.observedElements.findIndex((el) => el === target)
 
     if (elementIndex < 0) {
-      // We are more more liberal throwing errors than a normal ResizeObserver
-      // is, because we want to hold the tests to a higher standard of behavior.
+      // We are more liberal throwing errors than a normal ResizeObserver is,
+      // because we want to hold the tests to a higher standard of behavior.
       // Ideally your application should not be unobserving elements that aren't
       // being observed. Although this decision may need to be revisited in the
       // future if it turns out to be annoying.
@@ -52,24 +56,12 @@ export class MockResizeObserver implements ResizeObserver {
         )} but it wasn't being observed by any ResizeObservers`
       )
     }
-
-    const callbacks = this.resizeCallbacksByElementIndex[elementIndex]
-
-    const callbackIndex = callbacks.findIndex((fn) => fn === this.callback)
-
-    if (callbackIndex < 0) {
-      throw new Error(
-        `Tried to unobserve ${describeElement(
-          target
-        )} in a ResizeObserver that wasn't observering it`
-      )
-    }
-
-    callbacks.splice(callbackIndex, 1)
+    this.observedElements.splice(elementIndex, 1)
   }
 
   disconnect() {
     this.connected = false
+    this.onDisconnect(this)
   }
 
   resize(target: Element, entries: PartialResizeObserverEntry[]) {

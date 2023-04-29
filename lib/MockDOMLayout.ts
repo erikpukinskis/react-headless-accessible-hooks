@@ -44,11 +44,16 @@ export class MockDOMLayout {
       this.restoreResizeObseverMock()
     }
 
+    const disconnect = (observer: MockResizeObserver) => {
+      const index = this.resizeObservers.findIndex((ob) => ob === observer)
+      this.resizeObservers.splice(index, 1)
+    }
+
     global.ResizeObserver = vi
       .fn()
       .mockImplementation(
         (callback: ResizeObserverCallback): ResizeObserver => {
-          const observer = new MockResizeObserver(callback)
+          const observer = new MockResizeObserver(callback, disconnect)
           this.resizeObservers.push(observer)
           return observer
         }
