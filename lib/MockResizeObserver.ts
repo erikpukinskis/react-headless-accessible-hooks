@@ -1,3 +1,4 @@
+import { describeElement } from "./describeElement"
 import type { PartialResizeObserverEntry } from "./mockResizeObserverEntry"
 import { mockResizeObserverEntry } from "./mockResizeObserverEntry"
 
@@ -18,7 +19,7 @@ export class MockResizeObserver implements ResizeObserver {
   observe(target: Element) {
     if (this.observedElements.includes(target)) {
       // See note below about being liberal throwing errors
-      throw new Error("Already observing element")
+      throw new Error(`Already observing ${describeElement(target)}`)
     }
 
     // We keep track of elements by index. On observe we add the observed
@@ -39,14 +40,16 @@ export class MockResizeObserver implements ResizeObserver {
   unobserve(target: Element) {
     const elementIndex = this.observedElements.findIndex((el) => el === target)
 
-    if (!elementIndex) {
+    if (elementIndex < 0) {
       // We are more more liberal throwing errors than a normal ResizeObserver
       // is, because we want to hold the tests to a higher standard of behavior.
       // Ideally your application should not be unobserving elements that aren't
       // being observed. Although this decision may need to be revisited in the
       // future if it turns out to be annoying.
       throw new Error(
-        "Tried to unobserve an element that wasn't being observed by any ResizeObservers"
+        `Tried to unobserve ${describeElement(
+          target
+        )} but it wasn't being observed by any ResizeObservers`
       )
     }
 
@@ -56,7 +59,9 @@ export class MockResizeObserver implements ResizeObserver {
 
     if (callbackIndex < 0) {
       throw new Error(
-        "Tried to unobserve an element in a ResizeObserver that wasn't observering it"
+        `Tried to unobserve ${describeElement(
+          target
+        )} in a ResizeObserver that wasn't observering it`
       )
     }
 

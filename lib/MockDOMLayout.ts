@@ -1,6 +1,7 @@
 import type React from "react"
 import type { SpyInstance } from "vitest"
 import { vi } from "vitest"
+import { describeElement } from "./describeElement"
 import { mockDOMRect } from "./mockDOMRect"
 import { MockResizeObserver } from "./MockResizeObserver"
 import type { PartialResizeObserverEntry } from "./mockResizeObserverEntry"
@@ -177,17 +178,5 @@ export class MockDOMLayout {
         )} but no observers were observing it`
       )
     }
-  }
-}
-
-function describeElement(element: Element) {
-  const tag = element.tagName
-
-  if (element.id) {
-    return `${tag}#${element.id}`
-  } else if (element.classList.length > 0) {
-    return `${tag}.${Array.from(element.classList).join(".")}`
-  } else {
-    return tag
   }
 }
