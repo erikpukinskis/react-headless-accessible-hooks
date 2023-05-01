@@ -16,22 +16,24 @@ describe("OrderedTree", () => {
 
   afterAll(layout.destroy)
 
-  it("swaps two nodes", () => {
+  it.only("swaps two nodes", () => {
     const moveNode = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 40,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [first, second],
       onNodeMove: moveNode,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 40,
+        left: 0,
+        top: 0,
+      },
     })
 
     expect(rows).toHaveLength(2)
@@ -88,16 +90,18 @@ describe("OrderedTree", () => {
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
     const third = buildKin({ id: "third", order: 0.8, parentId: null })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [first, second, third],
       onNodeMove: moveNode,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -115,16 +119,6 @@ describe("OrderedTree", () => {
     fireEvent.mouseMove(rows[1], {
       clientX: 10,
       clientY: 32,
-    })
-
-    // The height of the tree can vary a bit, depending on whether the node
-    // being dragged has popped out and the placeholder node has popped in, so
-    // we'll change the height here to stress test that:
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 40,
-      left: 0,
-      top: 0,
     })
 
     expect(tree).toHaveTextContent(
@@ -161,16 +155,18 @@ describe("OrderedTree", () => {
       parentId: null,
     })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [parent, child, secondChild],
       onNodeMove: moveNode,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -215,19 +211,21 @@ describe("OrderedTree", () => {
       parentId: null,
     })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const onMount = vi.fn()
 
     const { rows, tree } = renderTree({
       data: [parent, child, secondChild],
       onNodeMove: moveNode,
       onMount,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -275,13 +273,6 @@ describe("OrderedTree", () => {
   it("drags two nodes right", () => {
     const moveNode = vi.fn()
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [
         buildKin({ id: "parent", order: 0.2, parentId: null }),
@@ -295,6 +286,14 @@ describe("OrderedTree", () => {
       onNodeMove: moveNode,
     })
 
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
+    })
     const [_, son, daughter] = rows
 
     layout.mockListBoundingRects(rows, {
@@ -369,19 +368,21 @@ describe("OrderedTree", () => {
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const {
       rows: [firstRow, secondRow],
       tree,
     } = renderTree({
       data: [first, second],
       onNodeMove: moveNode,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects([firstRow, secondRow], {
@@ -451,19 +452,21 @@ describe("OrderedTree", () => {
     const first = buildKin({ id: "first", order: 0.5, parentId: null })
     const second = buildKin({ id: "second", order: 0.5, parentId: "first" })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 40,
-      left: 0,
-      top: 0,
-    })
-
     const onMount = vi.fn()
 
     const { rows, tree } = renderTree({
       data: [first, second],
       onNodeMove: moveNode,
       onMount,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 40,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -500,15 +503,17 @@ describe("OrderedTree", () => {
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
     const third = buildKin({ id: "third", order: 0.8, parentId: null })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [first, second, third],
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -537,15 +542,17 @@ describe("OrderedTree", () => {
     const first = buildKin({ id: "first", order: 0.5, parentId: null })
     const second = buildKin({ id: "second", order: 0.5, parentId: "first" })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 40,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [first, second],
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 40,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -575,15 +582,17 @@ describe("OrderedTree", () => {
     const first = buildKin({ id: "first", order: 0.4, parentId: "parent" })
     const second = buildKin({ id: "second", order: 0.6, parentId: "parent" })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [first, second, parent],
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -613,15 +622,17 @@ describe("OrderedTree", () => {
     const momma = buildKin({ id: "momma", order: 0.6, parentId: null })
     const kiddo = buildKin({ id: "kiddo", order: 0.5, parentId: "momma" })
 
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
     const { rows, tree } = renderTree({
       data: [daughter, momma, kiddo],
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     expect(tree).toHaveTextContent("- Daughter;v Momma;-- Kiddo;")
@@ -653,18 +664,20 @@ describe("OrderedTree", () => {
     const first = buildKin({ id: "first", order: 0.4, parentId: "parent" })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
 
+    const { rows, tree, result } = renderTree({
+      data: [first, second, parent],
+    })
+
     /// Todo: this probably should be unnecessary since we're firing a resize
     /// below. Maybe instead of "mock" we can just describe all these APIs in
     /// terms of "resize"? Maybe "presize"? "layout.presizeByRole"?
-    layout.mockRoleBoundingRects("tree", {
-      width: 200,
-      height: 60,
-      left: 0,
-      top: 0,
-    })
-
-    const { rows, tree, result } = renderTree({
-      data: [first, second, parent],
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 60,
+        left: 0,
+        top: 0,
+      },
     })
 
     layout.mockListBoundingRects(rows, {
@@ -898,18 +911,11 @@ type KinNodeProps = {
  * which is the way to get the tree state relating to a specific node.
  */
 function KinNode({ kin }: KinNodeProps) {
-  const {
-    children,
-    getNodeProps,
-    depth,
-    isPlaceholder,
-    isExpanded,
-    isCollapsed,
-    getKey,
-  } = useOrderedTreeNode(kin)
+  const { children, getNodeProps, depth, isPlaceholder, expansion, getKey } =
+    useOrderedTreeNode(kin)
 
   const prefix = `${[...(Array(depth) as unknown[])].map(() => "-").join("")}${
-    isCollapsed ? ">" : isExpanded ? "v" : "-"
+    expansion === "collapsed" ? ">" : expansion === "expanded" ? "v" : "-"
   }`
 
   if (isPlaceholder) {

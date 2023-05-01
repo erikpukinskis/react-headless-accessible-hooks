@@ -219,20 +219,14 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     depth,
     isPlaceholder,
     isBeingDragged,
-    isExpanded,
-    isCollapsed,
+    expansion,
     getKey,
   } = useOrderedTreeNode(kin)
 
   if (isPlaceholder) {
     return (
       <Placeholder>
-        <DepthIndicator
-          id={kin.id}
-          depth={depth}
-          isCollapsed={isCollapsed}
-          isExpanded={isExpanded}
-        />
+        <DepthIndicator id={kin.id} depth={depth} expansion={expansion} />
         <PlaceholderShadow>{kin.name}</PlaceholderShadow>
       </Placeholder>
     )
@@ -242,15 +236,10 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     <>
       <DraggableRow {...getNodeProps()} isBeingDragged={isBeingDragged}>
         {isBeingDragged || (
-          <DepthIndicator
-            id={kin.id}
-            depth={depth}
-            isCollapsed={isCollapsed}
-            isExpanded={isExpanded}
-          />
+          <DepthIndicator id={kin.id} depth={depth} expansion={expansion} />
         )}
         <span
-          style={isExpanded || isCollapsed ? { fontWeight: 500 } : undefined}
+          style={expansion === "no children" ? undefined : { fontWeight: 500 }}
         >
           {kin.name}
         </span>
@@ -270,16 +259,10 @@ const SPACE = <>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</>
 type DepthIndicatorProps = {
   id: string
   depth: number
-  isCollapsed: boolean
-  isExpanded: boolean
+  expansion: "expanded" | "collapsed" | "no children"
 }
 
-const DepthIndicator = ({
-  id,
-  depth,
-  isCollapsed,
-  isExpanded,
-}: DepthIndicatorProps) => {
+const DepthIndicator = ({ id, depth, expansion }: DepthIndicatorProps) => {
   const emptyArray = Array(depth) as unknown[]
   const stars = [...emptyArray].map((_, i) => (
     <React.Fragment key={`depth-dot-${id}-${i}`}>
@@ -288,13 +271,13 @@ const DepthIndicator = ({
     </React.Fragment>
   ))
 
-  return isCollapsed ? (
+  return expansion === "collapsed" ? (
     <>
       {stars}
       {BLACK_RIGHT_POINTING_TRIANGLE}
       {SPACE}
     </>
-  ) : isExpanded ? (
+  ) : expansion === "expanded" ? (
     <>
       {stars}
       {BLACK_DOWN_POINTING_TRIANGLE}

@@ -24,7 +24,7 @@ type GetDragArgs<Datum> = {
   hoverIndex: number
   dx?: number
   dy?: number
-  isCollapsed: (id: string) => boolean
+  isCollapsed: (datum: Datum) => boolean
   isLastChild: (id: string) => boolean
 }
 
@@ -143,7 +143,7 @@ export function getDrag<Datum>({
 
   // If we're dragging farther right than the depth of the row above, we should
   // be able to insert as the first child (assuming it's not a collapsed node)
-  if (targetDepth > relativeDepth && !isCollapsed(nodeAbove.id)) {
+  if (targetDepth > relativeDepth && !isCollapsed(nodeAbove.data)) {
     return {
       ...data,
       move: "first-child",

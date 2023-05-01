@@ -37,6 +37,7 @@ export class OrderedTreeModel<Datum> {
   clientY = NaN
   dragStart?: DragStart<Datum>
   dragEnd?: DragEnd
+  isDropping = false
   data: Pick<
     DatumFunctions<Datum>,
     "getParentId" | "getOrder" | "getId" | "isCollapsed"
@@ -76,6 +77,36 @@ export class OrderedTreeModel<Datum> {
 
   setTree(tree: OrderedTreeBuild<Datum>) {
     this.tree = tree
+
+    if (this.isDropping) {
+      this.finishDrop()
+    }
+  }
+
+  finishDrop() {
+    const { dragStart, dragEnd } = this
+
+    // We reset the drag first, just in case something goes wrong with the drop
+    // below, the user can at least try to limp along and do another drag
+    this.isDropping = false
+    this.dragStart = undefined
+    this.dragEnd = undefined
+
+    if (!dragStart) {
+      throw new Error("Could not find dragStart in dropping state")
+    }
+
+    if (!dragEnd) {
+      throw new Error("Could not find dragEnd in dropping state")
+    }
+
+    if (!dragEnd?.parentId) {
+      throw new Error(
+        "In dropping state even though the drag ended outside the tree"
+      )
+    }
+
+    this.notifyNodeOfChange(dragEnd.parentId, { droppedOrder: null })
   }
 
   setTreeBox(box: TreeBox | undefined) {
@@ -87,25 +118,21 @@ export class OrderedTreeModel<Datum> {
   }
 
   getIndexes() {
-    if (
-      !this.dragStart ||
-      this.nodeIsCollapsed(this.dragStart.node.id) ||
-      this.dragStart.node.children.length === 0
-    ) {
-      // Unless we collapsed the drag node, we can just use the already built indexes
+    const didCollapseDragNode =
+      this.dragStart && this.dragStart.node.children.length > 0
+
+    if (!this.dragStart || !didCollapseDragNode) {
       const { nodesByIndex, indexesById } = this.tree
 
       return { nodesByIndex, indexesById }
     }
 
+    // Return the indexes if we already calculated them
     if (this.dragStart.nodesByIndex && this.dragStart.indexesById) {
       const { nodesByIndex, indexesById } = this.dragStart
 
       return { nodesByIndex, indexesById }
     }
-
-    // If we get here, we _did_ collapse the drag node, and we need to generate
-    // a new nodesByIndex without that node's children.
 
     const { nodesByIndex, indexesById } = buildTreeIndexesWithNodeCollapsed(
       this.tree,
@@ -156,10 +183,25 @@ export class OrderedTreeModel<Datum> {
 
   getPlaceholderDatum(): Datum {
     if (!this.dragStart) {
-      throw new Error("Can not get placeholder data when not dragging")
+      throw new Error("Can not get placeholder datum when not dragging")
     }
 
     return this.dragStart.placeholderDatum
+  }
+
+  getDroppedDatum(): Datum {
+    if (!this.dragStart) {
+      throw new Error("Can not get dropped datum when not dragging")
+    }
+
+    return this.dragStart.node.data
+  }
+
+  /**
+   * Returns true if there is no drag or drop in progress
+   */
+  isIdle() {
+    return !this.dragStart
   }
 
   isPlaceholderParent(id: string | null) {
@@ -189,51 +231,28 @@ export class OrderedTreeModel<Datum> {
     return key
   }
 
-  nodeIsCollapsed(id: string): boolean {
-    const node = this.tree.nodesById[id]
-
-    const isPlaceholder = this.isPlaceholder(node.data) /// FIXME Is there even a node for the placeholder? I don't thinks so.
-
+  getExpansion(datum: Datum): "expanded" | "collapsed" | "no children" {
+    const isPlaceholder = this.isPlaceholder(datum)
+    const node = this.getNode(datum)
+    const wasCollapsedByUser = this.data.isCollapsed(datum)
     const hasChildren = node.children.length > 0
+    const id = this.data.getId(datum)
+    const draggingIntoThisNode = id === this.dragEnd?.parentId
+    const draggedOutTheOnlyChild =
+      node.children.length === 1 &&
+      node.children[0].id !== this.dragStart?.node.id
 
-    // A node may be collapsed if it is the one we're dragging
-    if (isPlaceholder && hasChildren) {
-      return true
-    }
+    if (wasCollapsedByUser) return "collapsed"
 
-    // Otherwise it may have been collapsed by the user
-    return this.data.isCollapsed(node.data)
-  }
+    if (isPlaceholder && hasChildren) return "collapsed"
 
-  isExpanded(id: string): boolean {
-    const node = this.tree.nodesById[id]
+    if (draggingIntoThisNode) return "expanded"
 
-    // If we're not dragging then it's a simple matter of whether the node has
-    // any children
-    if (!this.dragEnd) {
-      return node.children.length > 0
-    }
+    if (draggedOutTheOnlyChild) return "no children"
 
-    // If there are more than one child then it's definitely expanded. Even if
-    // we are dragging one of the children out there's still one left.
-    if (node.children.length > 1) {
-      return true
-    }
+    if (!hasChildren) return "no children"
 
-    // If we're dragging the placeholder under this node then we're definitely expanded
-    if (id === this.dragEnd.parentId) {
-      return true
-    }
-
-    // At this point, we've verified the placeholder is not in here. So if there
-    // are no other children, we're definitely not expanded.
-    if (node.children.length === 0) {
-      return false
-    }
-
-    // Finally, we know there is only one child, but it may or may not have been
-    // dragged out.
-    return node.children[0].id !== this.dragStart?.node.id
+    return "expanded"
   }
 
   isLastChild(id: string): boolean {
@@ -310,11 +329,20 @@ export class OrderedTreeModel<Datum> {
   }
 
   /**
-   * Notify a node that the drag child either just left their children, or is
-   * just arriving into their children.
+   * There are a few different states of a node which change during the course
+   * of a drag. In order to only re-render the smallest number of nodes
+   * possible, each node in the tree sets up a listener (in the useParent hook).
+   * This function is used to notify those listeners of a temporary change to
+   * those pieces of state that can change during a drag:
+   *
+   *  - Whether the placeholder has been dragged into this node, and at what
+   *    order
+   *  - Whether a node has been dropped into this node, and at what order
+   *  - Whether the node has been collapsed or expanded during the course of the
+   *    drag
    */
-  notifyNodeOfChange(nodeId: string | null) {
-    this.nodeListenersById[nodeId ?? NoParent]?.()
+  notifyNodeOfChange(nodeId: string | null, change: NodeChange) {
+    this.nodeListenersById[nodeId ?? NoParent]?.(change)
   }
 
   /**
@@ -367,7 +395,7 @@ export class OrderedTreeModel<Datum> {
       hoverIndex,
       dx,
       dy,
-      isCollapsed: this.nodeIsCollapsed.bind(this),
+      isCollapsed: this.data.isCollapsed,
       isLastChild: this.isLastChild.bind(this),
     })
 
@@ -450,32 +478,39 @@ export class OrderedTreeModel<Datum> {
     const oldOrder = this.dragEnd?.order
 
     if (!this.dragEnd && this.dragStart.node.children.length > 0) {
-      this.notifyNodeOfChange(this.dragStart.node.id)
+      // Tell node that it is collapsed now
+      this.notifyNodeOfChange(this.dragStart.node.id, {
+        expansion: "collapsed",
+      })
     }
 
     this.dragEnd = newDrag
 
-    // If there was already a dragEnd previously, there will be an oldParentId
-    // here, which means the placeholder has already been placed amidst some
-    // siblings, and we might need to remove it. We only do that if the
-    // newParentId is different. In that case the order (within that old parent)
-    // can be undefined.
     if (oldParentId !== undefined && oldParentId !== newParentId) {
-      this.notifyNodeOfChange(oldParentId)
+      // If there was already a dragEnd previously, there will be an oldParentId
+      // here, which means the placeholder has already been placed amidst some
+      // siblings, and we might need to remove it. We only do that if the
+      // newParentId is different. In that case the placeholder order (within that old parent)
+      // will be null, which means the placeholder is no longer a child.
+      this.notifyNodeOfChange(oldParentId, { placeholderOrder: null })
     }
 
-    // If there is a new parent, we need to tell that parent they have the
-    // placeholder now. We also inform them if the order of the placeholder
-    // changed within that same parent.
     if (
       newParentId !== undefined &&
       (newParentId !== oldParentId || newOrder !== oldOrder)
     ) {
-      this.notifyNodeOfChange(newParentId)
+      // If there is a new parent, we need to tell that parent they have the
+      // placeholder now. We also inform them if the order of the placeholder
+      // changed within that same parent.
+      this.notifyNodeOfChange(newParentId, { placeholderOrder: newOrder })
     }
   }
 
   handleMouseDown(datum: Datum, event: React.MouseEvent) {
+    // If we've dropped something, we temporarily disable dragging until we get
+    // a new tree via setTree
+    if (this.isDropping) return
+
     if (!this.treeBox) return
 
     const mouseMoveHandler = this.handleMouseMove.bind(this)
@@ -519,21 +554,43 @@ export class OrderedTreeModel<Datum> {
   handleMouseUp() {
     const { dragStart, dragEnd } = this
 
-    this.dragStart = undefined
-    this.dragEnd = undefined
-
     if (!dragStart) {
       throw new Error("Got a mouseup event but drag never started")
     }
 
     if (!dragEnd) {
       // The mouse never moved
+      this.dragStart = undefined
       return
     }
 
+    const dragNodeWasCollapsed = this.data.isCollapsed(dragStart.node.data)
+    const dragNodeHasChildren = this.getNode(dragStart.node.data)
+    const dragNodeOriginalExpansion = !dragNodeHasChildren
+      ? "no children"
+      : dragNodeWasCollapsed
+      ? "collapsed"
+      : "expanded"
+
+    // Reset the drag node back like it was (expanded or collapsed or whatever)
+    this.notifyNodeOfChange(dragStart.node.id, {
+      expansion: dragNodeOriginalExpansion,
+    })
+
     if (dragEnd.parentId !== undefined) {
-      this.notifyNodeOfChange(dragEnd.parentId)
-      this.notifyNodeOfChange(dragStart.node.id)
+      //
+      this.notifyNodeOfChange(dragEnd.parentId, {
+        placeholderOrder: null,
+        droppedOrder: dragEnd.order,
+      })
+
+      this.notifyNodeOfChange(dragEnd.parentId, {
+        placeholderOrder: null,
+        droppedOrder: dragEnd.order,
+      })
+      this.dragEnd = undefined
+      this.dragStart = undefined
+
       this.moveNode(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
 
@@ -590,7 +647,13 @@ export type DragEnd = {
   newDepth: number
 }
 
-export type NodeListener = () => void
+type NodeChange = {
+  expansion?: "expanded" | "collapsed" | "no children"
+  placeholderOrder?: number | null
+  droppedOrder?: number | null
+}
+
+export type NodeListener = (change: NodeChange) => void
 
 const NoParent = Symbol("NoParent")
 

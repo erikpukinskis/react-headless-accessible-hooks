@@ -255,8 +255,7 @@ type UseOrderedTreeNodeReturnType<Datum> = {
   depth: number
   isBeingDragged: boolean
   hasChildren: boolean
-  isExpanded: boolean
-  isCollapsed: boolean
+  expansion: "expanded" | "collapsed" | "no children"
   isPlaceholder: boolean
   getKey: (datum: Datum) => string
 }
@@ -271,9 +270,9 @@ export function useOrderedTreeNode<Datum>(
   const isPlaceholder = model.isPlaceholder(datum)
   const childIsBeingDragged = model.childIsBeingDragged(node.id)
 
-  const { children, isExpanded, isCollapsed } = useParent(
+  const { children, expansion } = useParent(
     node.children,
-    node.id,
+    node.data,
     model,
     isPlaceholder
   )
@@ -298,12 +297,11 @@ export function useOrderedTreeNode<Datum>(
   const getKey = useCallback((datum: Datum) => model.getKey(datum), [model])
 
   return {
-    children: isCollapsed ? [] : children,
+    children,
+    expansion,
     getNodeProps,
     depth,
     isBeingDragged,
-    isExpanded,
-    isCollapsed,
     isPlaceholder,
     hasChildren,
     getKey,
@@ -312,8 +310,7 @@ export function useOrderedTreeNode<Datum>(
 
 type UseParentReturnType<Datum> = {
   children: Datum[]
-  isCollapsed: boolean
-  isExpanded: boolean
+  expansion: "expanded" | "collapsed" | "no children"
 }
 
 /**
@@ -327,25 +324,31 @@ type UseParentReturnType<Datum> = {
  */
 function useParent<Datum>(
   childNodes: OrderedTreeNode<Datum>[],
-  parentId: string | null,
+  parent: Datum | null,
   model: OrderedTreeModel<Datum>,
   isPlaceholder: boolean
 ): UseParentReturnType<Datum> {
   const [placeholderOrder, setPlaceholderOrder] = useState<number | null>(null)
-  const [isExpanded, setIsExpanded] = useState(
-    parentId !== null && model.isExpanded(parentId)
+  const [droppedOrder, setDroppedOrder] = useState<number | null>(null)
+  const [expansion, setExpansion] = useState(
+    parent === null ? "expanded" : model.getExpansion(parent)
   )
+
+  const parentId = parent ? model.data.getId(parent) : null
 
   useEffect(() => {
     if (isPlaceholder) return
 
-    const handleNodeChange: NodeListener = () => {
-      if (parentId !== null) {
-        setIsExpanded(model.isExpanded(parentId))
+    const handleNodeChange: NodeListener = (change) => {
+      if (change.expansion !== undefined) {
+        setExpansion(change.expansion)
       }
-      setPlaceholderOrder(
-        model.isPlaceholderParent(parentId) ? model.getPlaceholderOrder() : null
-      )
+      if (change.placeholderOrder !== undefined) {
+        setPlaceholderOrder(change.placeholderOrder)
+      }
+      if (change.droppedOrder !== undefined) {
+        setDroppedOrder(change.droppedOrder)
+      }
     }
 
     model.addPlaceholderListener(parentId, handleNodeChange)
@@ -359,50 +362,58 @@ function useParent<Datum>(
     function buildChildNodes(): Datum[] {
       if (isPlaceholder) return []
 
-      if (!model.dragStart) {
+      if (model.isIdle()) {
         return childNodes.map((node) => node.data)
       }
 
-      if (placeholderOrder === null) {
-        return childNodes.map((node) => node.data)
-      }
+      if (placeholderOrder !== null) {
+        const placeholderDatum = model.getPlaceholderDatum()
 
-      const placeholderDatum = model.getPlaceholderDatum()
+        if (!placeholderDatum) {
+          throw new Error(
+            "Could not get placeholder id, even though placeholder is included in these siblings"
+          )
+        }
 
-      if (!placeholderDatum) {
-        throw new Error(
-          "Could not get placeholder id, even though placeholder is included in these siblings"
+        const data = spliceSibling(
+          childNodes,
+          model.getPlaceholderDatum(),
+          placeholderOrder,
+          model.getOrder.bind(model)
         )
+
+        // assertUniqueKeys(data, model)
+
+        return data
+      } else if (droppedOrder !== null) {
+        const droppedDatum = model.getDroppedDatum()
+
+        if (!droppedDatum) {
+          throw new Error(
+            "Could not get placeholder id, even though placeholder is included in these siblings"
+          )
+        }
+
+        const data = spliceSibling(
+          childNodes,
+          droppedDatum,
+          droppedOrder,
+          model.getOrder.bind(model)
+        )
+
+        // assertUniqueKeys(data, model)
+
+        return data
+      } else {
+        return childNodes.map((node) => node.data)
       }
-
-      const data = splicePlaceholder(
-        childNodes,
-        model.getPlaceholderDatum(),
-        placeholderOrder,
-        model.getOrder.bind(model)
-      )
-
-      // assertUniqueKeys(data, model)
-
-      return data
     },
-    [model, childNodes, placeholderOrder, isPlaceholder]
+    [isPlaceholder, model, placeholderOrder, droppedOrder, childNodes]
   )
 
-  if (parentId === null) {
-    return { children, isCollapsed: false, isExpanded: false }
-  } else if (isPlaceholder || model.isBeingDragged(parentId)) {
-    return {
-      children: [],
-      isCollapsed: model.hasChildren(parentId),
-      isExpanded: false,
-    }
-  } else {
-    return {
-      children,
-      isCollapsed: model.nodeIsCollapsed(parentId),
-      isExpanded,
-    }
+  return {
+    children,
+    expansion,
   }
 }
 
@@ -436,25 +447,25 @@ function assertUniqueKeys<Datum>(
 
 /**
  * Returns a copy of the provided nodes array with an additional node spliced in
- * based on the provided order
+ * based on the order provided
  */
-function splicePlaceholder<Datum>(
+function spliceSibling<Datum>(
   siblings: OrderedTreeNode<Datum>[],
-  placeholderDatum: Datum,
-  placeholderOrder: number,
+  newSiblingDatum: Datum,
+  order: number,
   getOrder: (datum: Datum) => number
 ) {
   let spliceIndex = 0
   while (
     spliceIndex < siblings.length &&
-    getOrder(siblings[spliceIndex].data) < placeholderOrder
+    getOrder(siblings[spliceIndex].data) < order
   ) {
     spliceIndex++
   }
 
   const data = siblings.map((node) => node.data)
 
-  data.splice(spliceIndex, 0, placeholderDatum)
+  data.splice(spliceIndex, 0, newSiblingDatum)
 
   return data
 }
