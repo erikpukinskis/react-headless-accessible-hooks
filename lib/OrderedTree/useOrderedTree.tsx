@@ -13,6 +13,7 @@ import { buildTree } from "./buildTree"
 import type { NodeListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
+import { describeElement } from "~/describeElement"
 import { makeUninitializedContext } from "~/helpers"
 
 export type { DatumFunctions } from "./buildTree"
@@ -186,17 +187,18 @@ export function useOrderedTree<Datum>({
   const observedNodeRef = useRef<HTMLElement | null>(null)
   const [treeObserver] = useState(
     () =>
-      new ResizeObserver(function updateTreeBox([{ contentRect }]) {
-        if (!contentRect.width) {
+      new ResizeObserver(function updateTreeBox([entry]) {
+        const rect = entry.target.getBoundingClientRect()
+
+        if (!rect.width) {
           model.setTreeBox(undefined)
           return
         }
 
         model.setTreeBox({
-          top: contentRect.top,
-          height: contentRect.height,
-          offsetLeft: contentRect.left,
-          offsetTop: contentRect.top,
+          top: rect.top,
+          left: rect.left,
+          height: rect.height,
         })
       })
   )
@@ -216,6 +218,16 @@ export function useOrderedTree<Datum>({
         /// I still don't love how often we are setting the tree box to undefined
         model.setTreeBox(undefined)
         return
+      }
+
+      if (window.getComputedStyle(element).position !== "relative") {
+        throw new Error(
+          `The element you spread {...getTreeProps()} onto (${describeElement(
+            element
+          )}) must be have CSS position "relative" not "${
+            element.style.position || "static"
+          }".`
+        )
       }
 
       treeObserver.observe(element)

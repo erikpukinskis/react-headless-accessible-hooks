@@ -169,6 +169,7 @@ export class OrderedTreeModel<Datum> {
     }
 
     if (!this.isDropping) {
+      debugger
       throw new Error(
         "Cannot get dropped datum unless we are in the isDropping phase"
       )
@@ -287,9 +288,9 @@ export class OrderedTreeModel<Datum> {
     const dy = this.clientY - this.dragStart.clientY
     const rowHeight = this.dragStart.treeBox.height / this.tree.treeSize
     const index = this.getIndex(this.dragStart.node.id)
-    const rowTop = this.dragStart.treeBox.offsetTop + index * rowHeight
+    const rowTop = index * rowHeight
 
-    const left = `${(this.dragStart.treeBox.offsetLeft + dx).toFixed(1)}px`
+    const left = `${dx.toFixed(1)}px`
     const top = `${(rowTop + dy).toFixed(1)}px`
 
     const { element } = this.dragStart
@@ -570,15 +571,9 @@ export class OrderedTreeModel<Datum> {
       return
     }
 
-    // const dragNodeWasCollapsed = this.data.isCollapsed(dragStart.node.data)
-    // const dragNodeHasChildren =
-    //   this.getNode(dragStart.node.data).children.length > 0
-    // const dragNodeOriginalExpansion = !dragNodeHasChildren
-    //   ? "no children"
-    //   : dragNodeWasCollapsed
-    //   ? "collapsed"
-    //   : "expanded"
     const originalParentId = this.data.getParentId(dragStart.node.data)
+
+    this.isDropping = true
 
     // Reset the drag node back like it was (expanded or collapsed or whatever)
     this.notifyNodeOfChange(dragStart.node.id, {
@@ -605,8 +600,6 @@ export class OrderedTreeModel<Datum> {
         placeholderOrder: null,
         droppedOrder: dragEnd.order,
       })
-
-      this.isDropping = true
 
       this.moveNode(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
@@ -667,9 +660,8 @@ type DragStart<Datum> = {
 
 type TreeBox = {
   top: number
+  left: number
   height: number
-  offsetLeft: number
-  offsetTop: number
 }
 
 export type DragEnd = {

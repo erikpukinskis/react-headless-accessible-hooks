@@ -12,6 +12,7 @@ Necessary for an V1 release:
 
 Maybes:
 
+- [ ] Expand nodes when you hover on them for a couple seconds
 - [ ] Use portals to reparent placeholder and dropped node, to avoid a remount
 - [ ] Multiplayer
 - [ ] Support drag handles

@@ -85,25 +85,25 @@ export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
 
 const toRootNode = (kin: Kin) => ({ ...kin, parentId: null })
 
-export const WithChild = (
-  <Demo
-    render={Template}
-    props={{
-      data: [
-        { ...toRootNode(MOMMA), order: 0.2 },
-        KIDDO,
-        { ...toRootNode(AUNTIE), order: 0.4 },
-      ],
-    }}
-  />
-)
+// export const WithChild = (
+//   <Demo
+//     render={Template}
+//     props={{
+//       data: [
+//         { ...toRootNode(MOMMA), order: 0.2 },
+//         KIDDO,
+//         { ...toRootNode(AUNTIE), order: 0.4 },
+//       ],
+//     }}
+//   />
+// )
 
-export const WithCollapsedNode = (
-  <Demo
-    render={Template}
-    props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
-  />
-)
+// export const WithCollapsedNode = (
+//   <Demo
+//     render={Template}
+//     props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
+//   />
+// )
 
 type TemplateProps = {
   data: Kin[]
@@ -172,6 +172,7 @@ const Tree = styled("div", {
   flexDirection: "column",
   gap: 2,
   width: "100%",
+  position: "relative",
 })
 
 const Row = styled("div", {
