@@ -208,39 +208,39 @@ export function useOrderedTree<Datum>({
       })
   )
 
-  const callbackRef = useCallback(function callbackRef(
-    element: HTMLElement | null
-  ) {
-    if (observedNodeRef.current && observedNodeRef.current === element) {
-      return
-    }
+  const callbackRef = useCallback(
+    function callbackRef(element: HTMLElement | null) {
+      if (observedNodeRef.current && observedNodeRef.current === element) {
+        return
+      }
 
-    if (observedNodeRef.current && observedNodeRef.current !== element) {
-      treeObserver.unobserve(observedNodeRef.current)
-      observedNodeRef.current = null
-    }
+      if (observedNodeRef.current && observedNodeRef.current !== element) {
+        treeObserver.unobserve(observedNodeRef.current)
+        observedNodeRef.current = null
+      }
 
-    // if (!element && !first) {
-    //   throw new Error("Treebox became null")
-    // }
+      // if (!element && !first) {
+      //   throw new Error("Treebox became null")
+      // }
 
-    first = false
+      first = false
 
-    if (!element) {
-      console.log("element is null", {
-        first,
-        observing: Boolean(observedNodeRef.current),
-      })
-      model.setTreeBox(undefined)
-      return
-    } else {
-      console.log("found an element!", describeElement(element))
-    }
+      if (!element) {
+        console.log("element is null", {
+          first,
+          observing: Boolean(observedNodeRef.current),
+        })
+        model.setTreeBox(undefined)
+        return
+      } else {
+        console.log("found an element!", describeElement(element))
+      }
 
-    treeObserver.observe(element)
-    observedNodeRef.current = element
-  },
-  [])
+      treeObserver.observe(element)
+      observedNodeRef.current = element
+    },
+    [model, treeObserver]
+  )
 
   function getTreeProps() {
     return {
@@ -368,6 +368,7 @@ function useParent<Datum>(
 
   const [placeholderOrder, setPlaceholderOrder] = useState<number | null>(null)
   const [droppedOrder, setDroppedOrder] = useState<number | null>(null)
+  const [nodeIdToRemove, setNodeIdToRemove] = useState<string | null>(null)
   const [expansion, setExpansion] = useState(() => {
     console.log(
       isPlaceholder ? "mounting placeholder" : "mounting parent",
@@ -395,6 +396,9 @@ function useParent<Datum>(
         setDroppedOrder(change.droppedOrder)
         if (parent !== null) setExpansion(model.getExpansion(parent))
       }
+      if (change.nodeIdDraggedOut !== undefined) {
+        setNodeIdToRemove(change.nodeIdDraggedOut)
+      }
     }
 
     model.addPlaceholderListener(parentId, handleNodeChange)
@@ -402,17 +406,23 @@ function useParent<Datum>(
     return () => {
       model.removePlaceholderListener(parentId, handleNodeChange)
     }
-  }, [model, parentId, isPlaceholder])
+  }, [model, parentId, isPlaceholder, parent])
+
+  const childData = useMemo(() => {
+    const data = childNodes.map((node) => node.data)
+
+    assertUniqueKeys(data, model)
+
+    return data
+  }, [childNodes, model])
 
   const children = useMemo(
     function buildChildNodes(): Datum[] {
       if (isPlaceholder) return []
 
       if (model.isIdle()) {
-        return childNodes.map((node) => node.data)
-      }
-
-      if (placeholderOrder !== null) {
+        return childData
+      } else if (placeholderOrder !== null) {
         const placeholderDatum = model.getPlaceholderDatum()
 
         if (!placeholderDatum) {
@@ -421,14 +431,16 @@ function useParent<Datum>(
           )
         }
 
-        const data = spliceSibling(
-          childNodes,
-          model.getPlaceholderDatum(),
-          placeholderOrder,
-          model.getOrder.bind(model)
-        )
+        const data = spliceSibling({
+          siblings: childData,
+          addDatum: model.getPlaceholderDatum(),
+          atOrder: placeholderOrder,
+          removeId: null,
+          getOrder: model.getOrder.bind(model),
+          getId: model.data.getId,
+        })
 
-        // assertUniqueKeys(data, model)
+        assertUniqueKeys(data, model)
 
         return data
       } else if (droppedOrder !== null) {
@@ -440,21 +452,52 @@ function useParent<Datum>(
           )
         }
 
-        const data = spliceSibling(
-          childNodes,
-          droppedDatum,
-          droppedOrder,
-          model.getOrder.bind(model)
-        )
+        if (!model.dragStart) {
+          throw new Error(
+            "Have a droppedOrder which implies we are in the isDropping state, but no DragStart is present?"
+          )
+        }
 
-        // assertUniqueKeys(data, model)
+        /// We are getting a droppedDatum here, which is the same as the dragged
+        /// datum, but we're not seeing a dragged datum id yet.
+
+        const draggedIntoOriginalParent =
+          parentId === model.data.getParentId(model.dragStart.node.data)
+
+        if (draggedIntoOriginalParent && !nodeIdToRemove) {
+          throw new Error(
+            `Dragging a node (${
+              model.dragStart.node.id
+            }) within its same parent (${
+              parentId ?? "the root"
+            }), but we haven't been told a node id to remove. We could guess it, but this seems wrong.`
+          )
+        }
+
+        const data = spliceSibling({
+          siblings: childData,
+          removeId: nodeIdToRemove,
+          addDatum: droppedDatum,
+          atOrder: droppedOrder,
+          getOrder: model.getOrder.bind(model),
+          getId: model.data.getId,
+        })
+
+        assertUniqueKeys(data, model)
 
         return data
       } else {
-        return childNodes.map((node) => node.data)
+        return childData
       }
     },
-    [isPlaceholder, model, placeholderOrder, droppedOrder, childNodes]
+    [
+      isPlaceholder,
+      model,
+      placeholderOrder,
+      droppedOrder,
+      childData,
+      nodeIdToRemove,
+    ]
   )
 
   return {
@@ -463,7 +506,6 @@ function useParent<Datum>(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function assertUniqueKeys<Datum>(
   data: Datum[],
   model: OrderedTreeModel<Datum>
@@ -481,37 +523,55 @@ function assertUniqueKeys<Datum>(
   }
 
   if (duplicateKeys.length > 0) {
+    const allKeys = data.map(model.getKey.bind(model))
+
     throw new Error(
       `Key${duplicateKeys.length > 1 ? "s" : ""} ${duplicateKeys.join(
         ","
       )} appear${
         duplicateKeys.length > 1 ? "" : "s"
-      } twice in siblings: ${Object.keys(keys).join(",")}`
+      } twice in siblings: ${JSON.stringify(allKeys, null, 8)}`
     )
   }
+}
+
+type SpliceSiblingArgs<Datum> = {
+  siblings: Datum[]
+  addDatum: Datum
+  atOrder: number
+  removeId: string | null
+  getOrder: (datum: Datum) => number
+  getId: (datum: Datum) => string
 }
 
 /**
  * Returns a copy of the provided nodes array with an additional node spliced in
  * based on the order provided
  */
-function spliceSibling<Datum>(
-  siblings: OrderedTreeNode<Datum>[],
-  newSiblingDatum: Datum,
-  order: number,
-  getOrder: (datum: Datum) => number
-) {
+function spliceSibling<Datum>({
+  siblings,
+  addDatum,
+  atOrder,
+  removeId,
+  getOrder,
+  getId,
+}: SpliceSiblingArgs<Datum>) {
+  // First we remove any datums that match the removeId provided. We use this to
+  // remove children that have been dragged out of a parent during the isDropping
+  // phase.
+  const data = removeId
+    ? siblings.filter((datum) => getId(datum) !== removeId)
+    : [...siblings]
+
+  // Next we find the index where the addDatum should be spliced in. This will
+  // be either a placeholder datum, or during the isDropping phase it could be
+  // the dropped datum.
   let spliceIndex = 0
-  while (
-    spliceIndex < siblings.length &&
-    getOrder(siblings[spliceIndex].data) < order
-  ) {
+  while (spliceIndex < data.length && getOrder(data[spliceIndex]) < atOrder) {
     spliceIndex++
   }
 
-  const data = siblings.map((node) => node.data)
-
-  data.splice(spliceIndex, 0, newSiblingDatum)
+  data.splice(spliceIndex, 0, addDatum)
 
   return data
 }

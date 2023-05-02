@@ -129,7 +129,7 @@ export function getDrag<Datum>({
   //
   //    ... what we do here depends on the targetDepth
 
-  const relativeDepth = nodeAbove.parents.length
+  const relativeDepth = nodeAbove.parents.length /// let's change this to nodeAboveDepth
   const downDepth = (data.downDepth = downNode.parents.length)
   const drift = dx / 40
   const rawTargetDepth = downDepth + drift

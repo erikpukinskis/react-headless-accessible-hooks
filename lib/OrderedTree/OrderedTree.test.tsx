@@ -276,7 +276,7 @@ describe("OrderedTree", () => {
     expect(onMount).toHaveBeenCalledOnce()
   })
 
-  it.only("drags two nodes right", () => {
+  it("drags two nodes right", () => {
     const moveNode = vi.fn()
 
     const { rows, tree } = renderTree({
@@ -448,7 +448,6 @@ describe("OrderedTree", () => {
     })
 
     expect(tree).toHaveTextContent("- Second;- Placeholder for First;- First;")
-
     // And then drag to the right:
 
     fireEvent.mouseMove(firstRow, {
@@ -462,13 +461,13 @@ describe("OrderedTree", () => {
   it("places a child before its parent", () => {
     const moveNode = vi.fn()
 
-    const first = buildKin({ id: "first", order: 0.5, parentId: null })
-    const second = buildKin({ id: "second", order: 0.5, parentId: "first" })
+    const parent = buildKin({ id: "parent", order: 0.5, parentId: null })
+    const child = buildKin({ id: "child", order: 0.5, parentId: "parent" })
 
     const onMount = vi.fn()
 
     const { rows, tree } = renderTree({
-      data: [first, second],
+      data: [parent, child],
       onNodeMove: moveNode,
       onMount,
     })
@@ -489,7 +488,7 @@ describe("OrderedTree", () => {
       height: 20,
     })
 
-    expect(tree).toHaveTextContent("v First;-- Second;")
+    expect(tree).toHaveTextContent("v Parent;-- Child;")
 
     fireEvent.mouseDown(rows[1], {
       clientX: 10,
@@ -501,14 +500,16 @@ describe("OrderedTree", () => {
       clientY: 10,
     })
 
+    expect(tree).toHaveTextContent("- Placeholder for Child;- Parent;-- Child;")
+
     fireEvent.mouseUp(rows[1], {
       clientX: 10,
       clientY: 10,
     })
 
-    expect(moveNode).toHaveBeenCalledWith("second", 0.25, null)
+    expect(moveNode).toHaveBeenCalledWith("child", 0.25, null)
 
-    expect(tree).toHaveTextContent("- Second;- First;")
+    expect(tree).toHaveTextContent("- Child;- Parent;")
   })
 
   it("reparents a node by dragging it up and to the right", () => {

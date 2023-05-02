@@ -42,7 +42,7 @@
     "fix:format": "prettier --write --ignore-path .gitignore .",
     "fix:lint": "eslint --ignore-path .gitignore --no-error-on-unmatched-pattern . --fix; if [ $? -eq 0 ]; then echo 8J+OiSBObyBsaW50IGluIHRoaXMgY29kZSEKCg== | base64 -d; else exit 1; fi",
     "start:docs:dev": "vite serve docs --config vite.docs.config.js",
-    "test": "vitest run --config vite.test.config.js",
+    "test": "vitest run --config vite.test.config.js --reporter verbose",
     "watch:test": "vitest watch --config vite.test.config.js"
   },
   "dependencies": {
