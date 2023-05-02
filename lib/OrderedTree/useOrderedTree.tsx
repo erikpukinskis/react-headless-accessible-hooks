@@ -13,7 +13,6 @@ import { buildTree } from "./buildTree"
 import type { NodeListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
-import { describeElement } from "~/describeElement"
 import { makeUninitializedContext } from "~/helpers"
 
 export type { DatumFunctions } from "./buildTree"
@@ -85,8 +84,6 @@ type UseOrderedTreeReturnType<Datum> = {
   getKey(this: void, datum: Datum): string
 }
 
-let first = true
-
 export function useOrderedTree<Datum>({
   data,
 
@@ -104,10 +101,6 @@ export function useOrderedTree<Datum>({
 }: UseOrderedTreeArgs<Datum>): UseOrderedTreeReturnType<Datum> {
   const bulkOrderRef = useRef(onBulkNodeOrder)
   bulkOrderRef.current = onBulkNodeOrder
-
-  useEffect(() => {
-    console.log("^^^ mounting useOrderedTree")
-  }, [])
 
   const datumFunctions = useMemo(
     () => ({
@@ -219,21 +212,10 @@ export function useOrderedTree<Datum>({
         observedNodeRef.current = null
       }
 
-      // if (!element && !first) {
-      //   throw new Error("Treebox became null")
-      // }
-
-      first = false
-
       if (!element) {
-        console.log("element is null", {
-          first,
-          observing: Boolean(observedNodeRef.current),
-        })
+        /// I still don't love how often we are setting the tree box to undefined
         model.setTreeBox(undefined)
         return
-      } else {
-        console.log("found an element!", describeElement(element))
       }
 
       treeObserver.observe(element)
@@ -370,10 +352,6 @@ function useParent<Datum>(
   const [droppedOrder, setDroppedOrder] = useState<number | null>(null)
   const [nodeIdToRemove, setNodeIdToRemove] = useState<string | null>(null)
   const [expansion, setExpansion] = useState(() => {
-    console.log(
-      isPlaceholder ? "mounting placeholder" : "mounting parent",
-      parent ? model.getKey(parent) : "** root **"
-    )
     if (parent === null) return "expanded"
     else return model.getExpansion(parent)
   })

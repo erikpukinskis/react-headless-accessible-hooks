@@ -58,7 +58,6 @@ export class OrderedTreeModel<Datum> {
     dump,
     moveNode,
   }: OrderedTreeModelArgs<Datum>) {
-    console.log("^ New model")
     this.tree = tree
     this.data = { getParentId, getOrder, getId, isCollapsed }
     this.dump = dump ?? noop
@@ -68,7 +67,6 @@ export class OrderedTreeModel<Datum> {
   cleanup() {
     if (!this.dragStart) return
 
-    console.log("removing mousemove in cleanup")
     window.removeEventListener("mousemove", this.dragStart.mouseMoveHandler)
     window.removeEventListener("mouseup", this.dragStart.mouseUpHandler)
   }
@@ -86,10 +84,6 @@ export class OrderedTreeModel<Datum> {
   }
 
   setTreeBox(box: TreeBox | undefined) {
-    if (!box) {
-      /// I still don't love how often we are setting the tree box to undefined
-      debugger
-    }
     this.treeBox = box
   }
 
@@ -358,7 +352,6 @@ export class OrderedTreeModel<Datum> {
    *  - Notifies any parent nodes if they need to re-render their children
    */
   handleMouseMove(event: MouseEvent) {
-    console.log("handleMouseMove")
     this.clientX = event.clientX
     this.clientY = event.clientY
 
@@ -560,7 +553,6 @@ export class OrderedTreeModel<Datum> {
       mouseUpHandler,
     }
 
-    console.log("adding mouse move handler")
     window.addEventListener("mousemove", mouseMoveHandler)
     window.addEventListener("mouseup", mouseUpHandler)
   }
@@ -620,7 +612,6 @@ export class OrderedTreeModel<Datum> {
     }
 
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
-    console.log("removing mousemove handler")
     window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
 
     if (isLackingPrecision(dragEnd.order)) {

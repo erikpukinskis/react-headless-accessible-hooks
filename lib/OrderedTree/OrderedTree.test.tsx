@@ -12,15 +12,9 @@ describe("OrderedTree", () => {
 
   afterEach(cleanup)
 
-  afterEach(() => {
-    console.log("test is done")
-    layout.cleanup()
-  })
+  afterEach(() => layout.cleanup())
 
-  afterAll(() => {
-    console.log("suite is done")
-    layout.destroy()
-  })
+  afterAll(() => layout.destroy())
 
   it("swaps two nodes", () => {
     const moveNode = vi.fn()
@@ -316,7 +310,7 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent("- Parent;- Son;- Daughter;")
 
-    console.log("about to jiggle mouse....")
+    // Wiggle mouse
     fireEvent.mouseMove(son, {
       clientX: 11,
       clientY: 30,
@@ -326,7 +320,7 @@ describe("OrderedTree", () => {
       "- Parent;- Placeholder for Son;- Son;- Daughter;"
     )
 
-    console.log("about to drag son rightwards....")
+    // Drag son rightwards
     fireEvent.mouseMove(son, {
       clientX: 50,
       clientY: 30,
@@ -337,18 +331,15 @@ describe("OrderedTree", () => {
       clientY: 30,
     })
 
-    console.log("\ndone with first drag\n")
-
     expect(tree).toHaveTextContent("v Parent;-- Son;- Daughter;")
     expect(daughter).toBeInTheDocument()
 
-    console.log("mouse down, let's get another listener...")
     fireEvent.mouseDown(daughter, {
       clientX: 10,
       clientY: 50,
     })
 
-    console.log("about to move mouse...")
+    // Wiggle mouse
     fireEvent.mouseMove(daughter, {
       clientX: 11,
       clientY: 50,
@@ -676,23 +667,18 @@ describe("OrderedTree", () => {
   it("collapses nodes while dragging them", () => {
     const parent = buildKin({ id: "parent", order: 0.5, parentId: null })
     const child = buildKin({ id: "child", order: 0.4, parentId: "parent" })
+    const grandchild = buildKin({
+      id: "grandchild",
+      order: 0.4,
+      parentId: "child",
+    })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
 
     const { rows, tree, result } = renderTree({
-      data: [child, second, parent],
+      data: [child, second, parent, grandchild],
     })
 
-    /// Todo: this probably should be unnecessary since we're firing a resize
-    /// below. Maybe instead of "mock" we can just describe all these APIs in
-    /// terms of "resize"? Maybe "presize"? "layout.presizeByRole"?
-    layout.resize(tree, {
-      contentRect: {
-        width: 200,
-        height: 60,
-        left: 0,
-        top: 0,
-      },
-    })
+    expect(tree).toHaveTextContent("v Parent;-v Child;--- Grandchild;- Second;")
 
     layout.mockListBoundingRects(rows, {
       left: 0,
@@ -752,14 +738,12 @@ describe("OrderedTree", () => {
       "> Parent;- Second;> Placeholder for Parent;"
     )
 
-    return
-
     fireEvent.mouseUp(rows[0], {
       clientX: 10,
       clientY: 30,
     })
 
-    expect(tree).toHaveTextContent("- Second;v Parent;-- Child;")
+    expect(tree).toHaveTextContent("- Second;v Parent;-v Child;--- Grandchild;")
   })
 })
 
