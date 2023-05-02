@@ -745,6 +745,52 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent("- Second;v Parent;-v Child;--- Grandchild;")
   })
+
+  it("fires a row click event", () => {
+    const onClick = vi.fn()
+
+    const kin = buildKin({ id: "click-me", order: null })
+
+    const { rows, tree } = renderTree({
+      data: [kin],
+      onClick,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 20,
+        left: 0,
+        top: 0,
+      },
+    })
+
+    expect(rows).toHaveLength(1)
+
+    expect(tree).toHaveTextContent("- Click Me;")
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[0], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    fireEvent.mouseUp(rows[0], {
+      clientX: 10,
+      clientY: 12,
+    })
+
+    expect(tree).toHaveTextContent("- Click Me;")
+    expect(onClick).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "click-me" })
+    )
+  })
 })
 
 /**

@@ -68,6 +68,7 @@ function OrderedTreeProvider<Datum>({
 export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
   onNodeMove(id: string, newOrder: number, newParentId: string | null): void
+  onClick?(datum: Datum): void
   onBulkNodeOrder(ordersById: Record<string, number>): void
   dump?: DebugDataDumper
 }
@@ -98,6 +99,7 @@ export function useOrderedTree<Datum>({
   // Callbacks
   dump,
   onNodeMove,
+  onClick,
   onBulkNodeOrder,
 }: UseOrderedTreeArgs<Datum>): UseOrderedTreeReturnType<Datum> {
   const bulkOrderRef = useRef(onBulkNodeOrder)
@@ -131,7 +133,8 @@ export function useOrderedTree<Datum>({
         getId,
         isCollapsed,
         dump,
-        moveNode: onNodeMove,
+        onNodeMove,
+        onClick,
         collapseNode: () => {},
         expandNode: () => {},
       })
@@ -147,7 +150,7 @@ export function useOrderedTree<Datum>({
   )
 
   useEffect(() => {
-    model.setMoveNode(onNodeMove)
+    model.setMoveHandler(onNodeMove)
   }, [model, onNodeMove])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

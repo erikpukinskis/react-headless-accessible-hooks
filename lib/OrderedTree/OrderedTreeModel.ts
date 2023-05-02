@@ -23,11 +23,12 @@ type OrderedTreeModelArgs<Datum> = {
 
   // Other
   dump?: DebugDataDumper
-  moveNode: (
+  onNodeMove: (
     nodeId: string,
     newOrder: number,
     newParentId: string | null
   ) => void
+  onClick?: (datum: Datum) => void
   collapseNode(nodeId: string): void
   expandNode(nodeId: string): void
 }
@@ -47,7 +48,8 @@ export class OrderedTreeModel<Datum> {
   dump: DebugDataDumper
   nodeListenersById: Partial<Record<string | typeof NoParent, NodeListener>> =
     {}
-  moveNode: MoveNodeHandler
+  onNodeMove: MoveNodeHandler
+  onClick?: (datum: Datum) => void
 
   constructor({
     tree,
@@ -56,12 +58,14 @@ export class OrderedTreeModel<Datum> {
     getId,
     isCollapsed,
     dump,
-    moveNode,
+    onNodeMove,
+    onClick,
   }: OrderedTreeModelArgs<Datum>) {
     this.tree = tree
     this.data = { getParentId, getOrder, getId, isCollapsed }
     this.dump = dump ?? noop
-    this.moveNode = moveNode
+    this.onNodeMove = onNodeMove
+    this.onClick = onClick
   }
 
   cleanup() {
@@ -71,8 +75,8 @@ export class OrderedTreeModel<Datum> {
     window.removeEventListener("mouseup", this.dragStart.mouseUpHandler)
   }
 
-  setMoveNode(callback: MoveNodeHandler) {
-    this.moveNode = callback
+  setMoveHandler(callback: MoveNodeHandler) {
+    this.onNodeMove = callback
   }
 
   setTree(tree: OrderedTreeBuild<Datum>) {
@@ -567,7 +571,16 @@ export class OrderedTreeModel<Datum> {
 
     if (!dragEnd) {
       // The mouse never moved
+
+      const { dragStart } = this
+
+      if (!dragStart) {
+        throw new Error("Received a mouse up, but drag was never started?")
+      }
+
       this.dragStart = undefined
+      this.onClick?.(dragStart.node.data)
+
       return
     }
 
@@ -601,7 +614,7 @@ export class OrderedTreeModel<Datum> {
         droppedOrder: dragEnd.order,
       })
 
-      this.moveNode(dragStart.node.id, dragEnd.order, dragEnd.parentId)
+      this.onNodeMove(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
 
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
