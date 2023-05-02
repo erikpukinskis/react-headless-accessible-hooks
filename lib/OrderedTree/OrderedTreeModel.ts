@@ -448,14 +448,13 @@ export class OrderedTreeModel<Datum> {
       newDepth = dragData.relativeTo.parents.length
     }
 
-    const newDrag = {
-      /// let's rename to newDragEnd
+    const newDragEnd = {
       order: newOrder,
       parentId: newParentId,
       newDepth,
     }
 
-    if (isEqual(this.dragEnd, newDrag)) return
+    if (isEqual(this.dragEnd, newDragEnd)) return
 
     this.dump("new order", newOrder.toFixed(20))
     this.dump(
@@ -496,7 +495,7 @@ export class OrderedTreeModel<Datum> {
       })
     }
 
-    this.dragEnd = newDrag
+    this.dragEnd = newDragEnd
 
     if (oldParentId !== undefined && oldParentId !== newParentId) {
       // If there was already a dragEnd previously, there will be an oldParentId

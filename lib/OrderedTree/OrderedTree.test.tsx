@@ -675,11 +675,11 @@ describe("OrderedTree", () => {
 
   it("collapses nodes while dragging them", () => {
     const parent = buildKin({ id: "parent", order: 0.5, parentId: null })
-    const first = buildKin({ id: "first", order: 0.4, parentId: "parent" })
+    const child = buildKin({ id: "child", order: 0.4, parentId: "parent" })
     const second = buildKin({ id: "second", order: 0.6, parentId: null })
 
     const { rows, tree, result } = renderTree({
-      data: [first, second, parent],
+      data: [child, second, parent],
     })
 
     /// Todo: this probably should be unnecessary since we're firing a resize
@@ -715,6 +715,7 @@ describe("OrderedTree", () => {
       clientY: 10,
     })
 
+    // Nudge the mouse
     fireEvent.mouseMove(rows[0], {
       clientX: 10,
       clientY: 11,
@@ -758,7 +759,7 @@ describe("OrderedTree", () => {
       clientY: 30,
     })
 
-    expect(tree).toHaveTextContent("- Second;v Parent;-- First;")
+    expect(tree).toHaveTextContent("- Second;v Parent;-- Child;")
   })
 })
 

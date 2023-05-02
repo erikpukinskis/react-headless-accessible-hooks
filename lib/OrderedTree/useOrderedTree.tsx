@@ -408,7 +408,7 @@ function useParent<Datum>(
     }
   }, [model, parentId, isPlaceholder, parent])
 
-  const childData = useMemo(() => {
+  const originalChildren = useMemo(() => {
     const data = childNodes.map((node) => node.data)
 
     assertUniqueKeys(data, model)
@@ -421,7 +421,9 @@ function useParent<Datum>(
       if (isPlaceholder) return []
 
       if (model.isIdle()) {
-        return childData
+        return originalChildren
+      } else if (expansion === "collapsed") {
+        return []
       } else if (placeholderOrder !== null) {
         const placeholderDatum = model.getPlaceholderDatum()
 
@@ -432,7 +434,7 @@ function useParent<Datum>(
         }
 
         const data = spliceSibling({
-          siblings: childData,
+          siblings: originalChildren,
           addDatum: model.getPlaceholderDatum(),
           atOrder: placeholderOrder,
           removeId: null,
@@ -475,7 +477,7 @@ function useParent<Datum>(
         }
 
         const data = spliceSibling({
-          siblings: childData,
+          siblings: originalChildren,
           removeId: nodeIdToRemove,
           addDatum: droppedDatum,
           atOrder: droppedOrder,
@@ -487,15 +489,17 @@ function useParent<Datum>(
 
         return data
       } else {
-        return childData
+        return originalChildren
       }
     },
     [
       isPlaceholder,
+      expansion,
       model,
       placeholderOrder,
       droppedOrder,
-      childData,
+      originalChildren,
+      parentId,
       nodeIdToRemove,
     ]
   )
