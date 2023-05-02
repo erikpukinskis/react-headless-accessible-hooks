@@ -878,7 +878,7 @@ function KinTree({
   })
 
   return (
-    <div {...getTreeProps()}>
+    <div {...getTreeProps()} style={{ position: "relative" }}>
       <TreeProvider>
         {roots.map((node) => (
           <KinNode key={getKey(node)} data-key={getKey(node)} kin={node} />

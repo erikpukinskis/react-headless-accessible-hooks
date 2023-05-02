@@ -1,4 +1,5 @@
 import { describeElement } from "./describeElement"
+import { mockDOMRect } from "./mockDOMRect"
 import type { PartialResizeObserverEntry } from "./mockResizeObserverEntry"
 import { mockResizeObserverEntry } from "./mockResizeObserverEntry"
 
@@ -70,6 +71,18 @@ export class MockResizeObserver implements ResizeObserver {
     const index = this.observedElements.findIndex((el) => el === target)
 
     if (index < 0) return false
+
+    target.getBoundingClientRect = () => {
+      const entry = entries[0]
+
+      if (!entry.contentRect) {
+        throw new Error(
+          "Tried to call .getBoundingClientRect() on an element that we fired a mock resize event on, but the resize didn't include a contentRect.\n\nTry layout.resize(element, { contentRect: { top: ... } })"
+        )
+      }
+
+      return mockDOMRect(entry.contentRect)
+    }
 
     this.callback(
       entries.map((overrides) => {
