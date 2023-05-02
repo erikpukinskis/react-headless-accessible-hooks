@@ -12,11 +12,17 @@ describe("OrderedTree", () => {
 
   afterEach(cleanup)
 
-  afterEach(layout.cleanup)
+  afterEach(() => {
+    console.log("test is done")
+    layout.cleanup()
+  })
 
-  afterAll(layout.destroy)
+  afterAll(() => {
+    console.log("suite is done")
+    layout.destroy()
+  })
 
-  it.only("swaps two nodes", () => {
+  it("swaps two nodes", () => {
     const moveNode = vi.fn()
 
     const first = buildKin({ id: "first", order: 0.4, parentId: null })
@@ -270,7 +276,7 @@ describe("OrderedTree", () => {
     expect(onMount).toHaveBeenCalledOnce()
   })
 
-  it("drags two nodes right", () => {
+  it.only("drags two nodes right", () => {
     const moveNode = vi.fn()
 
     const { rows, tree } = renderTree({
@@ -310,6 +316,7 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent("- Parent;- Son;- Daughter;")
 
+    console.log("about to jiggle mouse....")
     fireEvent.mouseMove(son, {
       clientX: 11,
       clientY: 30,
@@ -319,6 +326,7 @@ describe("OrderedTree", () => {
       "- Parent;- Placeholder for Son;- Son;- Daughter;"
     )
 
+    console.log("about to drag son rightwards....")
     fireEvent.mouseMove(son, {
       clientX: 50,
       clientY: 30,
@@ -329,13 +337,18 @@ describe("OrderedTree", () => {
       clientY: 30,
     })
 
-    expect(tree).toHaveTextContent("v Parent;-- Son;- Daughter;")
+    console.log("\ndone with first drag\n")
 
+    expect(tree).toHaveTextContent("v Parent;-- Son;- Daughter;")
+    expect(daughter).toBeInTheDocument()
+
+    console.log("mouse down, let's get another listener...")
     fireEvent.mouseDown(daughter, {
       clientX: 10,
       clientY: 50,
     })
 
+    console.log("about to move mouse...")
     fireEvent.mouseMove(daughter, {
       clientX: 11,
       clientY: 50,

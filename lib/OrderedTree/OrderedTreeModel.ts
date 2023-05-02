@@ -58,6 +58,7 @@ export class OrderedTreeModel<Datum> {
     dump,
     moveNode,
   }: OrderedTreeModelArgs<Datum>) {
+    console.log("^ New model")
     this.tree = tree
     this.data = { getParentId, getOrder, getId, isCollapsed }
     this.dump = dump ?? noop
@@ -67,6 +68,7 @@ export class OrderedTreeModel<Datum> {
   cleanup() {
     if (!this.dragStart) return
 
+    console.log("removing mousemove in cleanup")
     window.removeEventListener("mousemove", this.dragStart.mouseMoveHandler)
     window.removeEventListener("mouseup", this.dragStart.mouseUpHandler)
   }
@@ -83,33 +85,10 @@ export class OrderedTreeModel<Datum> {
     }
   }
 
-  finishDrop() {
-    const { dragStart, dragEnd } = this
-
-    // We reset the drag first, just in case something goes wrong with the drop
-    // below, the user can at least try to limp along and do another drag
-    this.isDropping = false
-    this.dragStart = undefined
-    this.dragEnd = undefined
-
-    if (!dragStart) {
-      throw new Error("Could not find dragStart in dropping state")
-    }
-
-    if (!dragEnd) {
-      throw new Error("Could not find dragEnd in dropping state")
-    }
-
-    if (!dragEnd?.parentId) {
-      throw new Error(
-        "In dropping state even though the drag ended outside the tree"
-      )
-    }
-
-    this.notifyNodeOfChange(dragEnd.parentId, { droppedOrder: null })
-  }
-
   setTreeBox(box: TreeBox | undefined) {
+    if (!box) {
+      debugger
+    }
     this.treeBox = box
   }
 
@@ -217,18 +196,23 @@ export class OrderedTreeModel<Datum> {
   }
 
   getKey(datum: Datum) {
-    let key: string
-
     if (datum === this.dragStart?.placeholderDatum) {
       const placeholderId = this.data.getId(this.dragStart.placeholderDatum)
+      const parentId = this.dragEnd?.parentId
+      const parentDescription =
+        parentId === null
+          ? "root"
+          : parentId === undefined
+          ? "nothing"
+          : parentId
 
-      key = `placeholder-node-${placeholderId}`
+      return `placeholder-node-${placeholderId}-under-${parentDescription}`
     } else {
       const id = this.data.getId(datum)
-      key = `ordered-node-${id}`
-    }
+      const parentId = this.data.getParentId(datum) ?? "root"
 
-    return key
+      return `ordered-node-${id}-under-${parentId}`
+    }
   }
 
   getExpansion(datum: Datum): "expanded" | "collapsed" | "no children" {
@@ -240,7 +224,7 @@ export class OrderedTreeModel<Datum> {
     const draggingIntoThisNode = id === this.dragEnd?.parentId
     const draggedOutTheOnlyChild =
       node.children.length === 1 &&
-      node.children[0].id !== this.dragStart?.node.id
+      node.children[0].id === this.dragStart?.node.id
 
     if (wasCollapsedByUser) return "collapsed"
 
@@ -367,6 +351,7 @@ export class OrderedTreeModel<Datum> {
    *  - Notifies any parent nodes if they need to re-render their children
    */
   handleMouseMove(event: MouseEvent) {
+    console.log("handleMouseMove")
     this.clientX = event.clientX
     this.clientY = event.clientY
 
@@ -547,6 +532,7 @@ export class OrderedTreeModel<Datum> {
       mouseUpHandler,
     }
 
+    console.log("adding mouse move handler")
     window.addEventListener("mousemove", mouseMoveHandler)
     window.addEventListener("mouseup", mouseUpHandler)
   }
@@ -565,7 +551,8 @@ export class OrderedTreeModel<Datum> {
     }
 
     const dragNodeWasCollapsed = this.data.isCollapsed(dragStart.node.data)
-    const dragNodeHasChildren = this.getNode(dragStart.node.data)
+    const dragNodeHasChildren =
+      this.getNode(dragStart.node.data).children.length > 0
     const dragNodeOriginalExpansion = !dragNodeHasChildren
       ? "no children"
       : dragNodeWasCollapsed
@@ -595,6 +582,7 @@ export class OrderedTreeModel<Datum> {
     }
 
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
+    console.log("removing mousemove handler")
     window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
 
     if (isLackingPrecision(dragEnd.order)) {
@@ -604,6 +592,32 @@ export class OrderedTreeModel<Datum> {
         )}). We should defragment here, but RHAH doesn't support that yet`
       )
     }
+  }
+
+  finishDrop() {
+    const { dragStart, dragEnd } = this
+
+    // We reset the drag first, just in case something goes wrong with the drop
+    // below, the user can at least try to limp along and do another drag
+    this.isDropping = false
+    this.dragStart = undefined
+    this.dragEnd = undefined
+
+    if (!dragStart) {
+      throw new Error("Could not find dragStart in dropping state")
+    }
+
+    if (!dragEnd) {
+      throw new Error("Could not find dragEnd in dropping state")
+    }
+
+    if (!dragEnd?.parentId) {
+      throw new Error(
+        "In dropping state even though the drag ended outside the tree"
+      )
+    }
+
+    this.notifyNodeOfChange(dragEnd.parentId, { droppedOrder: null })
   }
 }
 

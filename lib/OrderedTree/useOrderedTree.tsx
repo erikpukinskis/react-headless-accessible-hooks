@@ -13,6 +13,7 @@ import { buildTree } from "./buildTree"
 import type { NodeListener } from "./OrderedTreeModel"
 import { OrderedTreeModel } from "./OrderedTreeModel"
 import type { DebugDataDumper } from "~/Debug"
+import { describeElement } from "~/describeElement"
 import { makeUninitializedContext } from "~/helpers"
 
 export type { DatumFunctions } from "./buildTree"
@@ -84,6 +85,8 @@ type UseOrderedTreeReturnType<Datum> = {
   getKey(this: void, datum: Datum): string
 }
 
+let first = true
+
 export function useOrderedTree<Datum>({
   data,
 
@@ -101,6 +104,10 @@ export function useOrderedTree<Datum>({
 }: UseOrderedTreeArgs<Datum>): UseOrderedTreeReturnType<Datum> {
   const bulkOrderRef = useRef(onBulkNodeOrder)
   bulkOrderRef.current = onBulkNodeOrder
+
+  useEffect(() => {
+    console.log("^^^ mounting useOrderedTree")
+  }, [])
 
   const datumFunctions = useMemo(
     () => ({
@@ -201,7 +208,9 @@ export function useOrderedTree<Datum>({
       })
   )
 
-  function callbackRef(element: HTMLElement | null) {
+  const callbackRef = useCallback(function callbackRef(
+    element: HTMLElement | null
+  ) {
     if (observedNodeRef.current && observedNodeRef.current === element) {
       return
     }
@@ -211,14 +220,27 @@ export function useOrderedTree<Datum>({
       observedNodeRef.current = null
     }
 
+    // if (!element && !first) {
+    //   throw new Error("Treebox became null")
+    // }
+
+    first = false
+
     if (!element) {
+      console.log("element is null", {
+        first,
+        observing: Boolean(observedNodeRef.current),
+      })
       model.setTreeBox(undefined)
       return
+    } else {
+      console.log("found an element!", describeElement(element))
     }
 
     treeObserver.observe(element)
     observedNodeRef.current = element
-  }
+  },
+  [])
 
   function getTreeProps() {
     return {
@@ -265,6 +287,9 @@ export function useOrderedTreeNode<Datum>(
 ): UseOrderedTreeNodeReturnType<Datum> {
   const model = useModel<Datum>()
 
+  // Note that if the datum is a placeholder, then it doesn't have a
+  // corresponding node. So this node is the node for the original datum, and
+  // node.data will be a different object than the placeholder datum:
   const node = model.getNode(datum)
   const isBeingDragged = model.isBeingDragged(node.id)
   const isPlaceholder = model.isPlaceholder(datum)
@@ -272,7 +297,7 @@ export function useOrderedTreeNode<Datum>(
 
   const { children, expansion } = useParent(
     node.children,
-    node.data,
+    datum,
     model,
     isPlaceholder
   )
@@ -328,11 +353,29 @@ function useParent<Datum>(
   model: OrderedTreeModel<Datum>,
   isPlaceholder: boolean
 ): UseParentReturnType<Datum> {
+  if (isPlaceholder) {
+    if (!parent) {
+      throw new Error("Root parent cannot be placeholder")
+    }
+    if (!Object.prototype.hasOwnProperty.call(parent, "__isRhahPlaceholder")) {
+      throw new Error(
+        `Tried to use placeholder parent, but datum with id ${model.data.getId(
+          parent
+        )} wasn't tagged as a placeholder`
+      )
+    }
+  }
+
   const [placeholderOrder, setPlaceholderOrder] = useState<number | null>(null)
   const [droppedOrder, setDroppedOrder] = useState<number | null>(null)
-  const [expansion, setExpansion] = useState(
-    parent === null ? "expanded" : model.getExpansion(parent)
-  )
+  const [expansion, setExpansion] = useState(() => {
+    console.log(
+      isPlaceholder ? "mounting placeholder" : "mounting parent",
+      parent ? model.getKey(parent) : "** root **"
+    )
+    if (parent === null) return "expanded"
+    else return model.getExpansion(parent)
+  })
 
   const parentId = parent ? model.data.getId(parent) : null
 
@@ -345,9 +388,12 @@ function useParent<Datum>(
       }
       if (change.placeholderOrder !== undefined) {
         setPlaceholderOrder(change.placeholderOrder)
+        // Moving the placeholder could change the expansion state:
+        if (parent !== null) setExpansion(model.getExpansion(parent))
       }
       if (change.droppedOrder !== undefined) {
         setDroppedOrder(change.droppedOrder)
+        if (parent !== null) setExpansion(model.getExpansion(parent))
       }
     }
 

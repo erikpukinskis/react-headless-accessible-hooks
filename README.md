@@ -1,8 +1,10 @@
 Hooks to power complex interactive components, leaving the DOM and styles to you.
 
-### Todo
+## Todo
 
-Necessary for a V1 release:
+### Ordered Tree
+
+Necessary for an V1 release:
 
 - [ ] Keyboard control
 - [ ] Accessibility announce & roles
@@ -10,7 +12,7 @@ Necessary for a V1 release:
 
 Maybes:
 
-- [ ] Support handles
-- [ ] Try: Auto-center dragging element
-- [ ] Rotation
-- [ ] Fix: flicker when dragging slowly into last position
+- [ ] Use portals to reparent placeholder and dropped node, to avoid a remount
+- [ ] Multiplayer
+- [ ] Support drag handles
+- [ ] Auto-center dragging element
