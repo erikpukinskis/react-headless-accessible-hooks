@@ -150,21 +150,12 @@ function Template({ data: initialData }: TemplateProps) {
         )
       },
       onClick(clickedKin) {
-        console.log("clicked", clickedKin)
         setData((data) =>
           data.map((kin) => {
             if (kin.id !== clickedKin.id) {
-              console.log(`${kin.id} was not clicked`)
               return kin
             }
 
-            console.log(
-              kin.id,
-              "was clicked, was",
-              kin.isCollapsed ? "collapsed" : "not collapsed",
-              "but now setting isCollapsed to",
-              !kin.isCollapsed
-            )
             return {
               ...kin,
               isCollapsed: !kin.isCollapsed,

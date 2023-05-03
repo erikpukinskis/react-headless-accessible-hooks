@@ -383,6 +383,15 @@ function useParent<Datum>(
     }
   })
 
+  useEffect(() => {
+    if (parent === null) return
+
+    setState((state) => ({
+      ...state,
+      expansion: model.getExpansion(parent),
+    }))
+  }, [model, parent])
+
   const parentId = parent ? model.data.getId(parent) : null
 
   useEffect(() => {
