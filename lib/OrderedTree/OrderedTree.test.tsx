@@ -83,7 +83,7 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
-  it("leaves dropped nodes in the tree until an update", () => {
+  it("leaves placeholder in the tree until an update", () => {
     const onNodeMove = vi.fn()
     let opacity = "1"
 
@@ -160,7 +160,7 @@ describe("OrderedTree", () => {
 
     expect(onNodeMove).toHaveBeenCalledWith("first", 0.8, null)
 
-    expect(tree).toHaveTextContent("- Second;- First;")
+    expect(tree).toHaveTextContent("- Second;- Placeholder for First;")
 
     expect(opacity).toBe("0.5")
   })

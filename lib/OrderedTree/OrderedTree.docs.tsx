@@ -81,7 +81,7 @@ const ORPHANS = [AUNTIE, MOMMA, TIO].map((sibling) => ({
   isCollapsed: false,
 }))
 
-export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
+// export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
 
 const toRootNode = (kin: Kin) => ({ ...kin, parentId: null })
 
@@ -98,12 +98,12 @@ const toRootNode = (kin: Kin) => ({ ...kin, parentId: null })
 //   />
 // )
 
-// export const WithCollapsedNode = (
-//   <Demo
-//     render={Template}
-//     props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
-//   />
-// )
+export const WithCollapsedNode = (
+  <Demo
+    render={Template}
+    props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
+  />
+)
 
 type TemplateProps = {
   data: Kin[]
@@ -147,6 +147,19 @@ function Template({ data: initialData }: TemplateProps) {
 
             return { ...kin, order: newOrder }
           })
+        )
+      },
+      onClick(clickedKin) {
+        console.log("clicked", clickedKin)
+        setData(
+          data.map((kin) =>
+            kin.id === clickedKin.id
+              ? {
+                  ...kin,
+                  isCollapsed: !kin.isCollapsed,
+                }
+              : kin
+          )
         )
       },
       getId: (kin) => kin.id,

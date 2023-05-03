@@ -458,6 +458,10 @@ export class OrderedTreeModel<Datum> {
 
     if (isEqual(this.dragEnd, newDragEnd)) return
 
+    const { dragEnd, dragStart } = this
+
+    this.dragEnd = newDragEnd
+
     this.dump("new order", newOrder.toFixed(20))
     this.dump(
       "new parent",
@@ -468,24 +472,11 @@ export class OrderedTreeModel<Datum> {
         : newParentId
     )
 
-    const oldParentId = this.dragEnd
-      ? this.dragEnd.parentId
-      : this.data.getParentId(this.dragStart.node.data)
+    const oldParentId = dragEnd
+      ? dragEnd.parentId
+      : this.data.getParentId(dragStart.node.data)
 
-    const oldOrder = this.dragEnd?.order
-
-    const changes: Partial<Record<string | typeof NoParent, NodeChange>> = {}
-
-    function addChange(nodeId: string | null, change: NodeChange) {
-      const key = nodeId === null ? NoParent : nodeId
-
-      const existingChanges = changes[key]
-
-      changes[key] = {
-        ...existingChanges,
-        ...change,
-      }
-    }
+    const oldOrder = dragEnd?.order
 
     // Regardless of whether there is a DragEnd yet, there will be. So we need
     // to notify the old parent that its expansion has possibly changed. If
@@ -496,21 +487,19 @@ export class OrderedTreeModel<Datum> {
           ? "expanded"
           : this.getExpansion(this.tree.nodesById[oldParentId].data)
 
-      addChange(oldParentId, {
+      this.notifyNodeOfChange(oldParentId, {
         expansion,
       })
     }
 
-    if (!this.dragEnd && this.dragStart.node.children.length > 0) {
+    if (!dragEnd && dragStart.node.children.length > 0) {
       // We just started dragging a node with children, so tell it that it is
       // collapsed now so the children are hidden and the expansion state
       // changes
-      addChange(this.dragStart.node.id, {
+      this.notifyNodeOfChange(dragStart.node.id, {
         expansion: "collapsed",
       })
     }
-
-    this.dragEnd = newDragEnd
 
     if (oldParentId !== undefined && oldParentId !== newParentId) {
       // If there was already a dragEnd previously, there will be an oldParentId
@@ -518,7 +507,7 @@ export class OrderedTreeModel<Datum> {
       // siblings, and we might need to remove it. We only do that if the
       // newParentId is different. In that case the placeholder order (within that old parent)
       // will be null, which means the placeholder is no longer a child.
-      addChange(oldParentId, {
+      this.notifyNodeOfChange(oldParentId, {
         placeholderOrder: null,
       })
     }
@@ -535,22 +524,10 @@ export class OrderedTreeModel<Datum> {
           ? "expanded"
           : this.getExpansion(this.tree.nodesById[newParentId].data)
 
-      addChange(newParentId, {
+      this.notifyNodeOfChange(newParentId, {
         placeholderOrder: newOrder,
         expansion,
       })
-    }
-
-    const keys = Reflect.ownKeys(changes) as (string | typeof NoParent)[]
-
-    for (const key of keys) {
-      const change = changes[key]
-
-      if (!change) {
-        throw new Error(`No change found for ${String(key)}`)
-      }
-
-      this.nodeListenersById[key]?.(change)
     }
   }
 
@@ -621,60 +598,19 @@ export class OrderedTreeModel<Datum> {
       return
     }
 
-    const originalParentId = this.data.getParentId(dragStart.node.data)
-
     this.isDropping = true
     this.onDroppingChange(true)
 
-    const changes: Partial<Record<string | typeof NoParent, NodeChange>> = {}
-
-    function addChange(nodeId: string | null, change: NodeChange) {
-      const key = nodeId === null ? NoParent : nodeId
-
-      const existingChanges = changes[key]
-
-      changes[key] = {
-        ...existingChanges,
-        ...change,
-      }
-    }
-
     // Reset the drag node back like it was (expanded or collapsed or whatever)
-    addChange(dragStart.node.id, {
+    this.notifyNodeOfChange(dragStart.node.id, {
       expansion: this.getExpansion(dragStart.node.data),
     })
 
     if (dragEnd.parentId !== undefined) {
-      // Wo we have to notify the original parent that the drag node will be
-      // temporarily shown somewhere else while we're in the dropping state. The
-      // dropped node could end up under another parent entirely, or it could
-      // just be in a different order in the same parent, but either way we
-      // filter out the original node from the tree and show the dropped node
-      // during the isDropping phase:
+      const originalParentId = this.data.getParentId(dragStart.node.data)
 
-      addChange(originalParentId, {
-        nodeIdDraggedOut: dragStart.node.id,
-      })
+      this.notifyNodeOfChange(originalParentId, { isDropping: true })
 
-      addChange(dragEnd.parentId, {
-        placeholderOrder: null,
-        droppedOrder: dragEnd.order,
-      })
-    }
-
-    const keys = Reflect.ownKeys(changes) as (string | typeof NoParent)[]
-
-    for (const key of keys) {
-      const change = changes[key]
-
-      if (!change) {
-        throw new Error(`No change found for ${String(key)}`)
-      }
-
-      this.nodeListenersById[key]?.(change)
-    }
-
-    if (dragEnd.parentId !== undefined) {
       this.onNodeMove(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
 
@@ -715,8 +651,17 @@ export class OrderedTreeModel<Datum> {
       )
     }
 
-    this.notifyNodeOfChange(dragStart.node.id, { nodeIdDraggedOut: null })
-    this.notifyNodeOfChange(dragEnd.parentId, { droppedOrder: null })
+    this.notifyNodeOfChange(dragEnd.parentId, {
+      placeholderOrder: null,
+      expansion:
+        dragEnd.parentId === null
+          ? "expanded"
+          : this.getExpansion(this.tree.nodesById[dragEnd.parentId].data),
+    })
+
+    const originalParentId = this.data.getParentId(dragStart.node.data)
+
+    this.notifyNodeOfChange(originalParentId, { isDropping: false })
   }
 }
 
@@ -762,8 +707,7 @@ export type DragEnd = {
 type NodeChange = {
   expansion?: "expanded" | "collapsed" | "no children"
   placeholderOrder?: number | null
-  droppedOrder?: number | null
-  nodeIdDraggedOut?: string | null
+  isDropping?: boolean
 }
 
 export type NodeListener = (change: NodeChange) => void

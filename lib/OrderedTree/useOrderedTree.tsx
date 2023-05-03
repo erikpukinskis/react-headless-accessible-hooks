@@ -341,9 +341,8 @@ type UseParentReturnType<Datum> = {
 
 type ParentState = {
   placeholderOrder: number | null
-  droppedOrder: number | null
-  nodeIdDraggedOut: string | null
   expansion: "expanded" | "collapsed" | "no children"
+  isDropping: boolean
 }
 
 /**
@@ -379,9 +378,8 @@ function useParent<Datum>(
 
     return {
       placeholderOrder: null,
-      droppedOrder: null,
-      nodeIdDraggedOut: null,
       expansion,
+      isDropping: false,
     }
   })
 
@@ -413,20 +411,23 @@ function useParent<Datum>(
 
   const children = useMemo(
     function buildChildNodes(): Datum[] {
-      const { expansion, placeholderOrder, droppedOrder, nodeIdDraggedOut } =
-        state
+      const { expansion, placeholderOrder, isDropping } = state
 
-      // if (parent === null && model.isDropping && droppedOrder === null) {
-      //   throw new Error("Dropped but no order")
-      // }
-
-      if (isPlaceholder) return []
+      if (isPlaceholder) {
+        return []
+      }
 
       if (model.isIdle()) {
         return originalChildren
-      } else if (expansion === "collapsed") {
+      }
+
+      if (expansion === "collapsed") {
         return []
-      } else if (placeholderOrder !== null) {
+      }
+
+      const removeId = isDropping ? model.dragStart?.node.id : undefined
+
+      if (placeholderOrder !== null) {
         const placeholderDatum = model.getPlaceholderDatum()
 
         if (!placeholderDatum) {
@@ -435,66 +436,29 @@ function useParent<Datum>(
           )
         }
 
+        const siblings = removeId
+          ? removeSibling([...originalChildren], removeId, model.data.getId)
+          : [...originalChildren]
+
         const data = spliceSibling({
-          siblings: originalChildren,
+          siblings,
           addDatum: model.getPlaceholderDatum(),
           atOrder: placeholderOrder,
-          removeId: null,
           getOrder: model.getOrder.bind(model),
-          getId: model.data.getId,
         })
 
         assertUniqueKeys(data, model)
 
         return data
-      } else if (droppedOrder !== null) {
-        const droppedDatum = model.getDroppedDatum()
-
-        if (!droppedDatum) {
-          throw new Error(
-            "Could not get placeholder id, even though placeholder is included in these siblings"
-          )
-        }
-
-        if (!model.dragStart) {
-          throw new Error(
-            "Have a droppedOrder which implies we are in the isDropping state, but no DragStart is present?"
-          )
-        }
-
-        /// We are getting a droppedDatum here, which is the same as the dragged
-        /// datum, but we're not seeing a dragged datum id yet.
-
-        const draggedIntoOriginalParent =
-          parentId === model.data.getParentId(model.dragStart.node.data)
-
-        if (draggedIntoOriginalParent && !nodeIdDraggedOut) {
-          throw new Error(
-            `Dragging a node (${
-              model.dragStart.node.id
-            }) within its same parent (${
-              parentId ?? "the root"
-            }), but we haven't been told a node id to remove. We could guess it, but this seems wrong.`
-          )
-        }
-
-        const data = spliceSibling({
-          siblings: originalChildren,
-          removeId: nodeIdDraggedOut,
-          addDatum: droppedDatum,
-          atOrder: droppedOrder,
-          getOrder: model.getOrder.bind(model),
-          getId: model.data.getId,
-        })
-
-        assertUniqueKeys(data, model)
-
-        return data
-      } else {
-        return originalChildren
       }
+
+      if (removeId !== undefined) {
+        return removeSibling([...originalChildren], removeId, model.data.getId)
+      }
+
+      return originalChildren
     },
-    [state, parent, model, isPlaceholder, originalChildren, parentId]
+    [state, isPlaceholder, model, originalChildren]
   )
 
   return {
@@ -536,9 +500,7 @@ type SpliceSiblingArgs<Datum> = {
   siblings: Datum[]
   addDatum: Datum
   atOrder: number
-  removeId: string | null
   getOrder: (datum: Datum) => number
-  getId: (datum: Datum) => string
 }
 
 /**
@@ -549,26 +511,28 @@ function spliceSibling<Datum>({
   siblings,
   addDatum,
   atOrder,
-  removeId,
   getOrder,
-  getId,
 }: SpliceSiblingArgs<Datum>) {
-  // First we remove any datums that match the removeId provided. We use this to
-  // remove children that have been dragged out of a parent during the isDropping
-  // phase.
-  const data = removeId
-    ? siblings.filter((datum) => getId(datum) !== removeId)
-    : [...siblings]
-
   // Next we find the index where the addDatum should be spliced in. This will
   // be either a placeholder datum, or during the isDropping phase it could be
   // the dropped datum.
   let spliceIndex = 0
-  while (spliceIndex < data.length && getOrder(data[spliceIndex]) < atOrder) {
+  while (
+    spliceIndex < siblings.length &&
+    getOrder(siblings[spliceIndex]) < atOrder
+  ) {
     spliceIndex++
   }
 
-  data.splice(spliceIndex, 0, addDatum)
+  siblings.splice(spliceIndex, 0, addDatum)
 
-  return data
+  return siblings
+}
+
+function removeSibling<Datum>(
+  siblings: Datum[],
+  idToRemove: string,
+  getId: (datum: Datum) => string
+) {
+  return siblings.filter((sibling) => getId(sibling) !== idToRemove)
 }
