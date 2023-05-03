@@ -1,10 +1,19 @@
 Hooks to power complex interactive components, leaving the DOM and styles to you.
 
-### Todo
+## Todo
 
-- [ ] If no confgen command is present, add one
-- [ ] Get codedocs templates working OOB
-- [ ] Get vitest templates working OOB
-- [ ] Set up RTL
-- [ ] Add basic test for drag-n-drop
-- [ ] Implement drag-n-drop
+### Ordered Tree
+
+Necessary for an V1 release:
+
+- [ ] Keyboard control
+- [ ] Accessibility announce & roles
+- [ ] Don't pause dragging while waiting for a fresh tree
+
+Maybes:
+
+- [ ] Expand nodes when you hover on them for a couple seconds
+- [ ] Use portals to reparent placeholder and dropped node, to avoid a remount
+- [ ] Multiplayer
+- [ ] Support drag handles
+- [ ] Auto-center dragging element
