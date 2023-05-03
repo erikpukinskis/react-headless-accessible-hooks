@@ -381,6 +381,8 @@ export class OrderedTreeModel<Datum> {
     const dx = this.clientX - this.dragStart.clientX
     const dy = this.clientY - this.dragStart.clientY
 
+    if (dx < 1 && dy < 1) return
+
     const { nodesByIndex } = this.getIndexes()
 
     const dragData = getDrag({
