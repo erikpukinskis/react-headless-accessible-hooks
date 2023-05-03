@@ -1,7 +1,7 @@
 import { render, fireEvent, cleanup } from "@testing-library/react"
 import produce from "immer"
 import { startCase } from "lodash"
-import React, { Profiler, useState } from "react"
+import React, { Profiler, useEffect, useState } from "react"
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import type { DatumFunctions, UseOrderedTreeArgs } from "./useOrderedTree"
@@ -81,6 +81,88 @@ describe("OrderedTree", () => {
     expect(moveNode).toHaveBeenCalledWith("first", 0.8, null)
 
     expect(tree).toHaveTextContent("- Second;- First;")
+  })
+
+  it("leaves dropped nodes in the tree until an update", () => {
+    const onNodeMove = vi.fn()
+    let opacity = "1"
+
+    const first = buildKin({ id: "first", order: 0.4, parentId: null })
+    const second = buildKin({ id: "second", order: 0.6, parentId: null })
+
+    function TreeWithDelayedSave() {
+      const state = useState([first, second])
+
+      const { roots, getTreeProps, getKey, TreeProvider, isDropping } =
+        useOrderedTree({
+          onNodeMove,
+          onBulkNodeOrder: () => {},
+          data: state[0],
+          ...DATUM_FUNCTIONS,
+        })
+
+      useEffect(() => {
+        opacity = isDropping ? "0.5" : "1"
+      }, [isDropping])
+
+      return (
+        <div {...getTreeProps()} style={{ position: "relative" }}>
+          <TreeProvider>
+            {roots.map((node) => (
+              <KinNode key={getKey(node)} data-key={getKey(node)} kin={node} />
+            ))}
+          </TreeProvider>
+        </div>
+      )
+    }
+
+    const result = render(<TreeWithDelayedSave />)
+
+    const rows = result.queryAllByRole("treeitem")
+    const tree = result.getByRole("tree")
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 40,
+        left: 0,
+        top: 0,
+      },
+    })
+
+    expect(rows).toHaveLength(2)
+
+    expect(tree).toHaveTextContent("- First;- Second;")
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[0], {
+      clientX: 10,
+      clientY: 10,
+    })
+
+    fireEvent.mouseMove(rows[0], {
+      clientX: 10,
+      clientY: 20,
+    })
+
+    expect(tree).toHaveTextContent("- First;- Second;- Placeholder for First;")
+
+    fireEvent.mouseUp(rows[0], {
+      clientX: 10,
+      clientY: 20,
+    })
+
+    expect(onNodeMove).toHaveBeenCalledWith("first", 0.8, null)
+
+    expect(tree).toHaveTextContent("- Second;- First;")
+
+    expect(opacity).toBe("0.5")
   })
 
   it("places a node as a child of another", () => {

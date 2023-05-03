@@ -29,6 +29,7 @@ type OrderedTreeModelArgs<Datum> = {
     newParentId: string | null
   ) => void
   onClick?: (datum: Datum) => void
+  onDroppingChange: (isDropping: boolean) => void
   collapseNode(nodeId: string): void
   expandNode(nodeId: string): void
 }
@@ -50,6 +51,7 @@ export class OrderedTreeModel<Datum> {
     {}
   onNodeMove: MoveNodeHandler
   onClick?: (datum: Datum) => void
+  onDroppingChange: (isDropping: boolean) => void
 
   constructor({
     tree,
@@ -60,12 +62,14 @@ export class OrderedTreeModel<Datum> {
     dump,
     onNodeMove,
     onClick,
+    onDroppingChange,
   }: OrderedTreeModelArgs<Datum>) {
     this.tree = tree
     this.data = { getParentId, getOrder, getId, isCollapsed }
     this.dump = dump ?? noop
     this.onNodeMove = onNodeMove
     this.onClick = onClick
+    this.onDroppingChange = onDroppingChange
   }
 
   cleanup() {
@@ -173,7 +177,6 @@ export class OrderedTreeModel<Datum> {
     }
 
     if (!this.isDropping) {
-      debugger
       throw new Error(
         "Cannot get dropped datum unless we are in the isDropping phase"
       )
@@ -267,7 +270,8 @@ export class OrderedTreeModel<Datum> {
 
   isBeingDragged(id: string) {
     if (!this.dragStart) return false
-    return this.dragStart.node.id === id
+    else if (this.isDropping) return false
+    else return this.dragStart.node.id === id
   }
 
   childIsBeingDragged(parentId: string) {
@@ -587,6 +591,7 @@ export class OrderedTreeModel<Datum> {
     const originalParentId = this.data.getParentId(dragStart.node.data)
 
     this.isDropping = true
+    this.onDroppingChange(true)
 
     // Reset the drag node back like it was (expanded or collapsed or whatever)
     this.notifyNodeOfChange(dragStart.node.id, {
@@ -600,19 +605,25 @@ export class OrderedTreeModel<Datum> {
       // just be in a different order in the same parent, but either way we
       // filter out the original node from the tree and show the dropped node
       // during the isDropping phase:
-      this.notifyNodeOfChange(originalParentId, {
+
+      const startChange = {
         nodeIdDraggedOut: dragStart.node.id,
-      })
+      }
 
-      this.notifyNodeOfChange(dragEnd.parentId, {
+      const endChange = {
         placeholderOrder: null,
         droppedOrder: dragEnd.order,
-      })
+      }
 
-      this.notifyNodeOfChange(dragEnd.parentId, {
-        placeholderOrder: null,
-        droppedOrder: dragEnd.order,
-      })
+      if (originalParentId === dragEnd.parentId) {
+        this.notifyNodeOfChange(originalParentId, {
+          ...startChange,
+          ...endChange,
+        })
+      } else {
+        this.notifyNodeOfChange(originalParentId, startChange)
+        this.notifyNodeOfChange(dragEnd.parentId, endChange)
+      }
 
       this.onNodeMove(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
@@ -637,6 +648,8 @@ export class OrderedTreeModel<Datum> {
     this.isDropping = false
     this.dragStart = undefined
     this.dragEnd = undefined
+
+    this.onDroppingChange(false)
 
     if (!dragStart) {
       throw new Error("Could not find dragStart in dropping state")

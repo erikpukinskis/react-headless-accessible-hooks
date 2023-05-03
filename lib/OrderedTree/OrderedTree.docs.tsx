@@ -1,4 +1,4 @@
-import { styled } from "@stitches/react"
+import { keyframes, styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
 import React, { useState } from "react"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
@@ -114,58 +114,87 @@ function Template({ data: initialData }: TemplateProps) {
 
   const dump = useDumpDebugData()
 
-  const { roots, getTreeProps, TreeProvider, getKey } = useOrderedTree({
-    data,
-    onNodeMove(id, newOrder, newParentId) {
-      const index = data.findIndex((datum) => datum.id === id)
-      const oldDatum = data[index]
+  const { roots, getTreeProps, TreeProvider, getKey, isDropping } =
+    useOrderedTree({
+      data,
+      onNodeMove(id, newOrder, newParentId) {
+        const index = data.findIndex((datum) => datum.id === id)
+        const oldDatum = data[index]
 
-      if (!oldDatum) {
-        throw new Error(`Received order change for missing id ${id}`)
-      }
+        if (!oldDatum) {
+          throw new Error(`Received order change for missing id ${id}`)
+        }
 
-      const newDatum = {
-        ...oldDatum,
-        order: newOrder,
-        parentId: newParentId,
-      }
+        const newDatum = {
+          ...oldDatum,
+          order: newOrder,
+          parentId: newParentId,
+        }
 
-      const newArray = [...data]
-      newArray[index] = newDatum
+        const newArray = [...data]
+        newArray[index] = newDatum
 
-      setData(newArray)
-    },
-    onBulkNodeOrder(ordersById) {
-      setData(
-        data.map((kin) => {
-          const newOrder = ordersById[kin.id]
+        setTimeout(() => {
+          setData(newArray)
+        }, 500)
+      },
+      onBulkNodeOrder(ordersById) {
+        setData(
+          data.map((kin) => {
+            const newOrder = ordersById[kin.id]
 
-          if (newOrder === undefined) return kin
+            if (newOrder === undefined) return kin
 
-          return { ...kin, order: newOrder }
-        })
-      )
-    },
-    getId: (kin) => kin.id,
-    getParentId: (kin) => kin.parentId,
-    getOrder: (kin) => kin.order,
-    compare: (a: Kin, b: Kin) => {
-      return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
-    },
-    isCollapsed: (kin) => kin.isCollapsed,
-    dump,
-  })
+            return { ...kin, order: newOrder }
+          })
+        )
+      },
+      getId: (kin) => kin.id,
+      getParentId: (kin) => kin.parentId,
+      getOrder: (kin) => kin.order,
+      compare: (a: Kin, b: Kin) => {
+        return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
+      },
+      isCollapsed: (kin) => kin.isCollapsed,
+      dump,
+    })
 
   return (
-    <Tree {...getTreeProps()}>
+    <Tree {...getTreeProps()} disabled={isDropping}>
       <TreeProvider>
         {roots.map((node) => (
           <TreeRows key={getKey(node)} kin={node} />
         ))}
       </TreeProvider>
+      {isDropping && <Spinner role="status" />}
     </Tree>
   )
 }
+
+const spin = keyframes({
+  to: { transform: "rotate(360deg)" },
+})
+
+const Spinner = styled("div", {
+  "&:before": {
+    content: "''",
+    boxSizing: "border-box",
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: "20px",
+    height: "20px",
+    marginTop: "-10px",
+    marginLeft: "-10px",
+    borderRadius: "50%",
+    border: "1px solid #fff6a1",
+    borderTopColor: "#7dcf7d",
+    borderRightColor: "#9fc4c6",
+    borderBottomColor: "#fff6a1",
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    animation: `${spin} .6s linear infinite`,
+  },
+})
 
 const Tree = styled("div", {
   display: "flex",
@@ -173,6 +202,15 @@ const Tree = styled("div", {
   gap: 2,
   width: "100%",
   position: "relative",
+
+  variants: {
+    disabled: {
+      true: {
+        pointerEvents: "none",
+        opacity: 0.5,
+      },
+    },
+  },
 })
 
 const Row = styled("div", {

@@ -59,7 +59,7 @@ function OrderedTreeProvider<Datum>({
   }
 
   return (
-    <OrderedTreeContext.Provider value={model}>
+    <OrderedTreeContext.Provider value={model as OrderedTreeModel<unknown>}>
       {children}
     </OrderedTreeContext.Provider>
   )
@@ -84,6 +84,7 @@ type UseOrderedTreeReturnType<Datum> = {
   getTreeProps: GetTreeProps
   TreeProvider(this: void, props: { children: React.ReactNode }): JSX.Element
   getKey(this: void, datum: Datum): string
+  isDropping: boolean
 }
 
 export function useOrderedTree<Datum>({
@@ -104,6 +105,7 @@ export function useOrderedTree<Datum>({
 }: UseOrderedTreeArgs<Datum>): UseOrderedTreeReturnType<Datum> {
   const bulkOrderRef = useRef(onBulkNodeOrder)
   bulkOrderRef.current = onBulkNodeOrder
+  const [isDropping, setIsDropping] = useState(false)
 
   const datumFunctions = useMemo(
     () => ({
@@ -134,6 +136,7 @@ export function useOrderedTree<Datum>({
         isCollapsed,
         dump,
         onNodeMove,
+        onDroppingChange: setIsDropping,
         onClick,
         collapseNode: () => {},
         expandNode: () => {},
@@ -255,6 +258,7 @@ export function useOrderedTree<Datum>({
     getTreeProps,
     TreeProvider,
     getKey,
+    isDropping,
   }
 }
 
@@ -335,6 +339,13 @@ type UseParentReturnType<Datum> = {
   expansion: "expanded" | "collapsed" | "no children"
 }
 
+type ParentState = {
+  placeholderOrder: number | null
+  droppedOrder: number | null
+  nodeIdDraggedOut: string | null
+  expansion: "expanded" | "collapsed" | "no children"
+}
+
 /**
  * Returns state regarding a node, specifically the state which can change
  * during a drag.
@@ -363,12 +374,15 @@ function useParent<Datum>(
     }
   }
 
-  const [placeholderOrder, setPlaceholderOrder] = useState<number | null>(null)
-  const [droppedOrder, setDroppedOrder] = useState<number | null>(null)
-  const [nodeIdToRemove, setNodeIdToRemove] = useState<string | null>(null)
-  const [expansion, setExpansion] = useState(() => {
-    if (parent === null) return "expanded"
-    else return model.getExpansion(parent)
+  const [state, setState] = useState<ParentState>(() => {
+    const expansion = parent === null ? "expanded" : model.getExpansion(parent)
+
+    return {
+      placeholderOrder: null,
+      droppedOrder: null,
+      nodeIdDraggedOut: null,
+      expansion,
+    }
   })
 
   const parentId = parent ? model.data.getId(parent) : null
@@ -377,21 +391,10 @@ function useParent<Datum>(
     if (isPlaceholder) return
 
     const handleNodeChange: NodeListener = (change) => {
-      if (change.expansion !== undefined) {
-        setExpansion(change.expansion)
-      }
-      if (change.placeholderOrder !== undefined) {
-        setPlaceholderOrder(change.placeholderOrder)
-        // Moving the placeholder could change the expansion state:
-        if (parent !== null) setExpansion(model.getExpansion(parent))
-      }
-      if (change.droppedOrder !== undefined) {
-        setDroppedOrder(change.droppedOrder)
-        if (parent !== null) setExpansion(model.getExpansion(parent))
-      }
-      if (change.nodeIdDraggedOut !== undefined) {
-        setNodeIdToRemove(change.nodeIdDraggedOut)
-      }
+      console.log("change", change)
+      setState((oldState) => {
+        return { ...oldState, ...change }
+      })
     }
 
     model.addPlaceholderListener(parentId, handleNodeChange)
@@ -411,6 +414,13 @@ function useParent<Datum>(
 
   const children = useMemo(
     function buildChildNodes(): Datum[] {
+      const { expansion, placeholderOrder, droppedOrder, nodeIdDraggedOut } =
+        state
+
+      if (parent === null && model.isDropping && droppedOrder === null) {
+        throw new Error("Dropped but no order")
+      }
+
       if (isPlaceholder) return []
 
       if (model.isIdle()) {
@@ -459,7 +469,7 @@ function useParent<Datum>(
         const draggedIntoOriginalParent =
           parentId === model.data.getParentId(model.dragStart.node.data)
 
-        if (draggedIntoOriginalParent && !nodeIdToRemove) {
+        if (draggedIntoOriginalParent && !nodeIdDraggedOut) {
           throw new Error(
             `Dragging a node (${
               model.dragStart.node.id
@@ -471,7 +481,7 @@ function useParent<Datum>(
 
         const data = spliceSibling({
           siblings: originalChildren,
-          removeId: nodeIdToRemove,
+          removeId: nodeIdDraggedOut,
           addDatum: droppedDatum,
           atOrder: droppedOrder,
           getOrder: model.getOrder.bind(model),
@@ -485,21 +495,12 @@ function useParent<Datum>(
         return originalChildren
       }
     },
-    [
-      isPlaceholder,
-      expansion,
-      model,
-      placeholderOrder,
-      droppedOrder,
-      originalChildren,
-      parentId,
-      nodeIdToRemove,
-    ]
+    [state, parent, model, isPlaceholder, originalChildren, parentId]
   )
 
   return {
     children,
-    expansion,
+    expansion: state.expansion,
   }
 }
 
