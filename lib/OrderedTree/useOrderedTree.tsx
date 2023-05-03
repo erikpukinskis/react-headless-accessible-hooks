@@ -73,11 +73,15 @@ export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   dump?: DebugDataDumper
 }
 
-type GetTreeProps = () => React.HTMLAttributes<HTMLElement> & {
+type GetTreeProps = () => {
   ref(node: HTMLElement | null): void
+  role: "tree"
 }
 
-type GetNodeProps = () => React.HTMLAttributes<HTMLElement>
+type GetNodeProps = () => {
+  onMouseDown: (event: React.MouseEvent<Element, MouseEvent>) => void
+  role: "treeitem"
+}
 
 type UseOrderedTreeReturnType<Datum> = {
   roots: Datum[]
@@ -246,7 +250,7 @@ export function useOrderedTree<Datum>({
     return {
       role: "tree",
       ref: callbackRef,
-    }
+    } as const
   }
 
   function getKey(datum: Datum) {
@@ -307,7 +311,7 @@ export function useOrderedTreeNode<Datum>(
     return {
       onMouseDown: model.handleMouseDown.bind(model, datum),
       role: "treeitem",
-    }
+    } as const
   }, [model, datum])
 
   // TODO: do we want getPlaceholderProps with some of the above?
