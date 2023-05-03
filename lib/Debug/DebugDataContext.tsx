@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react"
-import { makeUninitializedContext, now, toUnix } from "~/helpers"
 import { DebugDataService, type Dumpable } from "./DebugDataService"
+import { makeUninitializedContext } from "~/helpers"
 
 const DebugDataContext = createContext(
   makeUninitializedContext<DebugDataService>(
@@ -17,6 +17,7 @@ export function DebugDataProvider({ children }: DebugDataProviderProps) {
 
   useEffect(() => {
     return () => service.destroy()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
@@ -34,6 +35,7 @@ export function useDebugData() {
     service.addChangeListener(setValues)
 
     return () => service.removeChangeListener(setValues)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return values
