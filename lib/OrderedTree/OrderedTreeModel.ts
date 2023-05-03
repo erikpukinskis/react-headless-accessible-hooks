@@ -268,10 +268,10 @@ export class OrderedTreeModel<Datum> {
     return datum === this.dragStart?.placeholderDatum
   }
 
-  isBeingDragged(id: string) {
+  isBeingDragged(datum: Datum) {
     if (!this.dragStart) return false
     else if (this.isDropping) return false
-    else return this.dragStart.node.id === id
+    else return this.dragStart.node.data === datum
   }
 
   childIsBeingDragged(parentId: string) {

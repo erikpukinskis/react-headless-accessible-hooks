@@ -292,7 +292,7 @@ export function useOrderedTreeNode<Datum>(
   // corresponding node. So this node is the node for the original datum, and
   // node.data will be a different object than the placeholder datum:
   const node = model.getNode(datum)
-  const isBeingDragged = model.isBeingDragged(node.id)
+  const isBeingDragged = model.isBeingDragged(datum)
   const isPlaceholder = model.isPlaceholder(datum)
   const childIsBeingDragged = model.childIsBeingDragged(node.id)
 
