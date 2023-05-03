@@ -75,6 +75,7 @@ export class OrderedTreeModel<Datum> {
   cleanup() {
     if (!this.dragStart) return
 
+    console.log("removing listeners in cleanup")
     window.removeEventListener("mousemove", this.dragStart.mouseMoveHandler)
     window.removeEventListener("mouseup", this.dragStart.mouseUpHandler)
   }
@@ -572,6 +573,7 @@ export class OrderedTreeModel<Datum> {
       mouseUpHandler,
     }
 
+    console.log("adding listeners")
     window.addEventListener("mousemove", mouseMoveHandler)
     window.addEventListener("mouseup", mouseUpHandler)
   }
@@ -595,6 +597,9 @@ export class OrderedTreeModel<Datum> {
       this.dragStart = undefined
       this.onClick?.(dragStart.node.data)
 
+      window.removeEventListener("mouseup", dragStart.mouseUpHandler)
+      window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
+
       return
     }
 
@@ -614,6 +619,7 @@ export class OrderedTreeModel<Datum> {
       this.onNodeMove(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
 
+    console.log("removing listeners")
     window.removeEventListener("mouseup", dragStart.mouseUpHandler)
     window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
 
