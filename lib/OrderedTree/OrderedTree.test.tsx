@@ -198,6 +198,7 @@ describe("OrderedTree", () => {
       clientY: 30,
     })
 
+    // Just a wiggle
     fireEvent.mouseMove(rows[1], {
       clientX: 10,
       clientY: 32,

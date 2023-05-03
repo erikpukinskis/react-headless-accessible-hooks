@@ -474,6 +474,19 @@ export class OrderedTreeModel<Datum> {
 
     const oldOrder = this.dragEnd?.order
 
+    const changes: Partial<Record<string | typeof NoParent, NodeChange>> = {}
+
+    function addChange(nodeId: string | null, change: NodeChange) {
+      const key = nodeId === null ? NoParent : nodeId
+
+      const existingChanges = changes[key]
+
+      changes[key] = {
+        ...existingChanges,
+        ...change,
+      }
+    }
+
     // Regardless of whether there is a DragEnd yet, there will be. So we need
     // to notify the old parent that its expansion has possibly changed. If
     // there is a DragEnd and the parent has changed then we can skip this.
@@ -483,7 +496,7 @@ export class OrderedTreeModel<Datum> {
           ? "expanded"
           : this.getExpansion(this.tree.nodesById[oldParentId].data)
 
-      this.notifyNodeOfChange(oldParentId, {
+      addChange(oldParentId, {
         expansion,
       })
     }
@@ -492,7 +505,7 @@ export class OrderedTreeModel<Datum> {
       // We just started dragging a node with children, so tell it that it is
       // collapsed now so the children are hidden and the expansion state
       // changes
-      this.notifyNodeOfChange(this.dragStart.node.id, {
+      addChange(this.dragStart.node.id, {
         expansion: "collapsed",
       })
     }
@@ -505,7 +518,7 @@ export class OrderedTreeModel<Datum> {
       // siblings, and we might need to remove it. We only do that if the
       // newParentId is different. In that case the placeholder order (within that old parent)
       // will be null, which means the placeholder is no longer a child.
-      this.notifyNodeOfChange(oldParentId, {
+      addChange(oldParentId, {
         placeholderOrder: null,
       })
     }
@@ -517,7 +530,27 @@ export class OrderedTreeModel<Datum> {
       // If there is a new parent, we need to tell that parent they have the
       // placeholder now. We also inform them if the order of the placeholder
       // changed within that same parent.
-      this.notifyNodeOfChange(newParentId, { placeholderOrder: newOrder })
+      const expansion =
+        newParentId === null
+          ? "expanded"
+          : this.getExpansion(this.tree.nodesById[newParentId].data)
+
+      addChange(newParentId, {
+        placeholderOrder: newOrder,
+        expansion,
+      })
+    }
+
+    const keys = Reflect.ownKeys(changes) as (string | typeof NoParent)[]
+
+    for (const key of keys) {
+      const change = changes[key]
+
+      if (!change) {
+        throw new Error(`No change found for ${String(key)}`)
+      }
+
+      this.nodeListenersById[key]?.(change)
     }
   }
 
@@ -593,8 +626,21 @@ export class OrderedTreeModel<Datum> {
     this.isDropping = true
     this.onDroppingChange(true)
 
+    const changes: Partial<Record<string | typeof NoParent, NodeChange>> = {}
+
+    function addChange(nodeId: string | null, change: NodeChange) {
+      const key = nodeId === null ? NoParent : nodeId
+
+      const existingChanges = changes[key]
+
+      changes[key] = {
+        ...existingChanges,
+        ...change,
+      }
+    }
+
     // Reset the drag node back like it was (expanded or collapsed or whatever)
-    this.notifyNodeOfChange(dragStart.node.id, {
+    addChange(dragStart.node.id, {
       expansion: this.getExpansion(dragStart.node.data),
     })
 
@@ -606,25 +652,29 @@ export class OrderedTreeModel<Datum> {
       // filter out the original node from the tree and show the dropped node
       // during the isDropping phase:
 
-      const startChange = {
+      addChange(originalParentId, {
         nodeIdDraggedOut: dragStart.node.id,
-      }
+      })
 
-      const endChange = {
+      addChange(dragEnd.parentId, {
         placeholderOrder: null,
         droppedOrder: dragEnd.order,
+      })
+    }
+
+    const keys = Reflect.ownKeys(changes) as (string | typeof NoParent)[]
+
+    for (const key of keys) {
+      const change = changes[key]
+
+      if (!change) {
+        throw new Error(`No change found for ${String(key)}`)
       }
 
-      if (originalParentId === dragEnd.parentId) {
-        this.notifyNodeOfChange(originalParentId, {
-          ...startChange,
-          ...endChange,
-        })
-      } else {
-        this.notifyNodeOfChange(originalParentId, startChange)
-        this.notifyNodeOfChange(dragEnd.parentId, endChange)
-      }
+      this.nodeListenersById[key]?.(change)
+    }
 
+    if (dragEnd.parentId !== undefined) {
       this.onNodeMove(dragStart.node.id, dragEnd.order, dragEnd.parentId)
     }
 

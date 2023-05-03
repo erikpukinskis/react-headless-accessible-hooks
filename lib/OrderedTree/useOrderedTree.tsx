@@ -391,7 +391,6 @@ function useParent<Datum>(
     if (isPlaceholder) return
 
     const handleNodeChange: NodeListener = (change) => {
-      console.log("change", change)
       setState((oldState) => {
         return { ...oldState, ...change }
       })
@@ -417,9 +416,9 @@ function useParent<Datum>(
       const { expansion, placeholderOrder, droppedOrder, nodeIdDraggedOut } =
         state
 
-      if (parent === null && model.isDropping && droppedOrder === null) {
-        throw new Error("Dropped but no order")
-      }
+      // if (parent === null && model.isDropping && droppedOrder === null) {
+      //   throw new Error("Dropped but no order")
+      // }
 
       if (isPlaceholder) return []
 
