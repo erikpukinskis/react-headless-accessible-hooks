@@ -1,5 +1,5 @@
 import { isEmpty } from "lodash"
-import {
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -17,23 +17,6 @@ import { describeElement } from "~/describeElement"
 import { makeUninitializedContext } from "~/helpers"
 
 export type { DatumFunctions } from "./buildTree"
-
-// moving down...
-//  - if hoverNeed has (expanded) children, insert before first child of hoverNeed
-//  - if targetDepth is higher than the hoverNeed depth, and hoverNeed is not collapsed, insert as first child of hoverNeed
-//  - if hoverNeed is not a last child, insert after hoverNeed
-//  - while there's a next parent, and next parent is a last child
-//      - go to next parent
-//  - if there was a parent, insert after that parent
-//  - otherwise insert after hoverNeed
-
-// moving up...
-//  - if the target depth is higher than the hoverNeed depth...
-//      - grab the hoverNeed - 1 parents (incl. hoverNeed - 1) starting at the target depth
-//      - if the parent is a last child, insert after the parent
-//      - keep doing down the parents (incl. hoverNeed - 1) until you get to a last child
-//      - if the target depth is higher than hoverNeed - 1, and hoverNeed - 1 is not collapsed, add it as the only child of hoverNeed - 1
-//  - otherwise insert before the hoverNeed
 
 const OrderedTreeContext = createContext(
   makeUninitializedContext<OrderedTreeModel<unknown>>(

@@ -1,4 +1,5 @@
 import { styled } from "@stitches/react"
+import React from "react"
 import { useDebugData } from "./DebugDataContext"
 
 const Toast = styled("div", {
