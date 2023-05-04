@@ -1,14 +1,16 @@
 {
   "name": "react-headless-accessible-hooks",
-  "version": "0.10.0-beta.3",
+  "version": "0.10.0-beta.2",
   "license": "MIT",
+  "main": "./dist/lib.umd.js",
   "module": "./dist/lib.es.js",
   "files": [
     "dist"
   ],
   "exports": {
     ".": {
-      "import": "./dist/lib.es.js"
+      "import": "./dist/lib.es.js",
+      "require": "./dist/lib.umd.js"
     }
   },
   "dependencies": {
