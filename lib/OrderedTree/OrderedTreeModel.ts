@@ -268,10 +268,10 @@ export class OrderedTreeModel<Datum> {
     return datum === this.dragStart?.placeholderDatum
   }
 
-  isBeingDragged(id: string) {
+  isBeingDragged(datum: Datum) {
     if (!this.dragStart) return false
     else if (this.isDropping) return false
-    else return this.dragStart.node.id === id
+    else return this.dragStart.node.data === datum
   }
 
   childIsBeingDragged(parentId: string) {
@@ -361,11 +361,12 @@ export class OrderedTreeModel<Datum> {
    *  - Notifies any parent nodes if they need to re-render their children
    */
   handleMouseMove(event: MouseEvent) {
-    this.clientX = event.clientX
-    this.clientY = event.clientY
+    this.clientX = event.clientX + window.scrollX
+    this.clientY = event.clientY + window.scrollY
 
     this.dump("clientX", this.clientX)
     this.dump("clientY", this.clientY)
+    this.dump("scrollY", window.scrollY)
 
     if (!this.dragStart) {
       // throw new Error("No dragStart but we received a mouse move")
@@ -543,8 +544,8 @@ export class OrderedTreeModel<Datum> {
     const mouseMoveHandler = this.handleMouseMove.bind(this)
     const mouseUpHandler = this.handleMouseUp.bind(this)
 
-    this.clientX = event.clientX
-    this.clientY = event.clientY
+    this.clientX = event.clientX + window.scrollX
+    this.clientY = event.clientY + window.scrollY
 
     const element = event.currentTarget
 

@@ -1,5 +1,5 @@
 import { isEmpty } from "lodash"
-import {
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -17,23 +17,6 @@ import { describeElement } from "~/describeElement"
 import { makeUninitializedContext } from "~/helpers"
 
 export type { DatumFunctions } from "./buildTree"
-
-// moving down...
-//  - if hoverNeed has (expanded) children, insert before first child of hoverNeed
-//  - if targetDepth is higher than the hoverNeed depth, and hoverNeed is not collapsed, insert as first child of hoverNeed
-//  - if hoverNeed is not a last child, insert after hoverNeed
-//  - while there's a next parent, and next parent is a last child
-//      - go to next parent
-//  - if there was a parent, insert after that parent
-//  - otherwise insert after hoverNeed
-
-// moving up...
-//  - if the target depth is higher than the hoverNeed depth...
-//      - grab the hoverNeed - 1 parents (incl. hoverNeed - 1) starting at the target depth
-//      - if the parent is a last child, insert after the parent
-//      - keep doing down the parents (incl. hoverNeed - 1) until you get to a last child
-//      - if the target depth is higher than hoverNeed - 1, and hoverNeed - 1 is not collapsed, add it as the only child of hoverNeed - 1
-//  - otherwise insert before the hoverNeed
 
 const OrderedTreeContext = createContext(
   makeUninitializedContext<OrderedTreeModel<unknown>>(
@@ -73,11 +56,15 @@ export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   dump?: DebugDataDumper
 }
 
-type GetTreeProps = () => React.HTMLAttributes<HTMLElement> & {
+type GetTreeProps = () => {
   ref(node: HTMLElement | null): void
+  role: "tree"
 }
 
-type GetNodeProps = () => React.HTMLAttributes<HTMLElement>
+type GetNodeProps = () => {
+  onMouseDown: (event: React.MouseEvent<Element, MouseEvent>) => void
+  role: "treeitem"
+}
 
 type UseOrderedTreeReturnType<Datum> = {
   roots: Datum[]
@@ -202,8 +189,8 @@ export function useOrderedTree<Datum>({
         }
 
         model.setTreeBox({
-          top: rect.top,
-          left: rect.left,
+          top: rect.top + window.scrollY,
+          left: rect.left + window.scrollX,
           height: rect.height,
         })
       })
@@ -246,7 +233,7 @@ export function useOrderedTree<Datum>({
     return {
       role: "tree",
       ref: callbackRef,
-    }
+    } as const
   }
 
   function getKey(datum: Datum) {
@@ -292,7 +279,7 @@ export function useOrderedTreeNode<Datum>(
   // corresponding node. So this node is the node for the original datum, and
   // node.data will be a different object than the placeholder datum:
   const node = model.getNode(datum)
-  const isBeingDragged = model.isBeingDragged(node.id)
+  const isBeingDragged = model.isBeingDragged(datum)
   const isPlaceholder = model.isPlaceholder(datum)
   const childIsBeingDragged = model.childIsBeingDragged(node.id)
 
@@ -307,7 +294,7 @@ export function useOrderedTreeNode<Datum>(
     return {
       onMouseDown: model.handleMouseDown.bind(model, datum),
       role: "treeitem",
-    }
+    } as const
   }, [model, datum])
 
   // TODO: do we want getPlaceholderProps with some of the above?
