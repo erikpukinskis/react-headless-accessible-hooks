@@ -189,8 +189,8 @@ export function useOrderedTree<Datum>({
         }
 
         model.setTreeBox({
-          top: rect.top,
-          left: rect.left,
+          top: rect.top + window.scrollY,
+          left: rect.left + window.scrollX,
           height: rect.height,
         })
       })
