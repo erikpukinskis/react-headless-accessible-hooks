@@ -3,7 +3,8 @@ import React from "react"
 import { render } from "react-dom"
 import * as HomeDocs from "./Home.docs"
 import { DebugToast, DebugDataProvider } from "~/Debug"
-import * as UseOrderedTreeDocs from "~/OrderedTree/OrderedTree.docs"
+import * as OrderedListDocs from "~/OrderedList/OrderedList.docs"
+import * as OrderedTreeDocs from "~/OrderedTree/OrderedTree.docs"
 
 render(
   <>
@@ -12,7 +13,7 @@ render(
       <DocsApp
         logo="React Headless Accessible Hooks"
         icon="anchor"
-        docs={[HomeDocs, UseOrderedTreeDocs]}
+        docs={[HomeDocs, OrderedTreeDocs, OrderedListDocs]}
       />
     </DebugDataProvider>
   </>,

@@ -956,7 +956,7 @@ type KinTreeProps = Partial<UseOrderedTreeArgs<Kin>> & {
 }
 
 /**
- * Example component which renders an orderable tree of family members.
+ * Example component which renders a re-orderable tree of family members.
  *
  * This component sets up the `useOrderedTree` hook, its callbacks, and then
  * renders out the root nodes (where the parent id is `null`).
