@@ -26,9 +26,6 @@ Maybes:
 - [x] Set up RTL
 - [x] Add basic test for drag-n-drop
 - [x] Implement drag-n-drop
-
-Finish useOrderableList + cleanup:
-
 - [x] Grab down
 - [x] Don't allow drag away
 - [x] Add to bottom of list when you're within gap + height below if placeholder is gone

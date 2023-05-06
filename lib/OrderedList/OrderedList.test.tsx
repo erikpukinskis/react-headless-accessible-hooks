@@ -2,45 +2,10 @@ import { render, fireEvent, cleanup } from "@testing-library/react"
 import { sortBy } from "lodash"
 import React, { useState } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { useOrderableList } from "~/index"
-import { mockDomRect } from "~/testHelpers"
+import { useOrderedList } from "~/index"
+import { mockDOMRect } from "~/testHelpers"
 
-const USERS = [
-  {
-    id: "1",
-    handle: "@yvonnezlam",
-  },
-  {
-    id: "2",
-    handle: "@rsms",
-  },
-  {
-    id: "3",
-    handle: "@pavelasamsonov",
-  },
-]
-
-const mockDomRects = (elements: HTMLElement[]) => {
-  let y = 0
-  for (const element of elements) {
-    vi.spyOn(element, "getBoundingClientRect").mockReturnValue(
-      mockDomRect({
-        width: 200,
-        height: 20,
-        top: y,
-        bottom: y + 20,
-        left: 0,
-        right: 0,
-      })
-    )
-
-    if (element.style.position !== "absolute") {
-      y += 20
-    }
-  }
-}
-
-describe("useOrderableList", () => {
+describe("OrderedList", () => {
   const onClick = vi.fn()
 
   type ListProps = {
@@ -56,7 +21,7 @@ describe("useOrderableList", () => {
       onOrderChange?.(sortedIds)
     }
 
-    const { getItemProps, items, isPlaceholder } = useOrderableList(users, {
+    const { getItemProps, items, isPlaceholder } = useOrderedList(users, {
       onOrderChange: handleOrderChange,
     })
 
@@ -126,7 +91,7 @@ describe("useOrderableList", () => {
     expect(onClick).toHaveBeenCalledOnce()
   })
 
-  it.only("should pop the element out and add a placeholder if we drag", () => {
+  it("should pop the element out and add a placeholder if we drag", () => {
     const { getAllByRole } = render(<List />)
 
     const items = getAllByRole("listitem")
@@ -447,4 +412,39 @@ const toNumber = (str: string) => {
     )
   }
   return num
+}
+
+const USERS = [
+  {
+    id: "1",
+    handle: "@yvonnezlam",
+  },
+  {
+    id: "2",
+    handle: "@rsms",
+  },
+  {
+    id: "3",
+    handle: "@pavelasamsonov",
+  },
+]
+
+const mockDomRects = (elements: HTMLElement[]) => {
+  let y = 0
+  for (const element of elements) {
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue(
+      mockDOMRect({
+        width: 200,
+        height: 20,
+        top: y,
+        bottom: y + 20,
+        left: 0,
+        right: 0,
+      })
+    )
+
+    if (element.style.position !== "absolute") {
+      y += 20
+    }
+  }
 }

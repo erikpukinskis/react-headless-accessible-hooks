@@ -1,4 +1,3 @@
-import without from "lodash/without"
 import { assertHTMLTarget, moveItemTo } from "~/helpers"
 
 type Point = { x: number; y: number }
@@ -9,10 +8,10 @@ type DragServiceOptions = {
 }
 
 /**
- * The DragService keeps track of all of the data that doesn't need to directly
+ * The OrderedListModel keeps track of all of the data that doesn't need to directly
  * affect React state.
  *
- * The `useOrderableList` hook only keeps state for the couple of things that
+ * The `useOrderedList` hook only keeps state for the couple of things that
  * need to trigger re-renders of the consuming component. I.e. the things that
  * change when a placeholder moves:
  *  - `placeholderItemIndex`
@@ -31,7 +30,7 @@ type DragServiceOptions = {
  *  - an "element index" is the index of an item within the DOM elements,
  *    INCLUDING the placeholder. We use this to iterate over those elements
  */
-export class DragService {
+export class OrderedListModel {
   downId: string | undefined
   downAt: Point | undefined
   lastPoint: Point | undefined
@@ -68,9 +67,9 @@ export class DragService {
     this.downAt = this.lastPoint = { x: event.clientX, y: event.clientY }
     this.lastDirection = undefined
     this.downElement = event.target
-    this.downId = event.target.dataset.rhahOrderableListId
+    this.downId = event.target.dataset.__rhahOrderedListId
     this.originalItemIndex = this.elements.findIndex(
-      (element) => element.dataset.rhahOrderableListId === this.downId
+      (element) => element.dataset.__rhahOrderedListId === this.downId
     )
     if (this.originalItemIndex < 0) {
       throw new Error("what is original index?")
@@ -80,7 +79,7 @@ export class DragService {
   }
 
   /**
-   * Each time the `useOrderableList` hook re-renders we rebuild a list of DOM
+   * Each time the `useOrderedList` hook re-renders we rebuild a list of DOM
    * Elements stored here in the DragService. The way that works is the hook
    * calls this `resetElementList` function, which empties out the list, and
    * then when the `getItemProps(i)` function is called for each item in the
@@ -125,7 +124,7 @@ export class DragService {
   }
 
   getRect(element: HTMLElement) {
-    // const id = element.dataset.rhahOrderableListId as string
+    // const id = element.dataset.__rhahOrderedListId as string
 
     // FIXME: If the element changes size ever, this cache will be stale. So
     // we'll need to add ResizeObservers at some point to invalidate the cache.
@@ -143,7 +142,7 @@ export class DragService {
   getLastRect() {
     if (this.maxElementIndex < 0) return
     const element = this.elements[this.maxElementIndex]
-    if (element.dataset.rhahOrderableListId !== this.draggingId) {
+    if (element.dataset.__rhahOrderedListId !== this.draggingId) {
       return this.getRect(element)
     }
     if (this.maxElementIndex < 1) return
@@ -172,7 +171,7 @@ export class DragService {
   getItemIndex(elementIndex: number) {
     const element = this.elements[elementIndex]
     // If this is the placeholder, they are the same:
-    if (isPlaceholderId(element.dataset.rhahOrderableListId || "")) {
+    if (isPlaceholderId(element.dataset.__rhahOrderedListId || "")) {
       return elementIndex
     }
     // If we didn't place the placeholder yet, they are the same:
@@ -283,7 +282,6 @@ export class DragService {
         this.placeholderItemIndex // this is wrong because it's "might swap" on the placeholder but by definition, placeholder items shouldn't be included in item indexes
       )
 
-      debugger
       this.onDragEnd(newItemIds)
     }
 
@@ -302,7 +300,7 @@ export class DragService {
 }
 
 const getItemId = (element: HTMLElement) => {
-  return element.dataset.rhahOrderableListId as string
+  return element.dataset.__rhahOrderedListId as string
 }
 
 export const isPlaceholderId = (id: string) => /^rhah-placeholder-/.test(id)
@@ -312,7 +310,7 @@ const withoutPlaceholderIds = (ids: string[]) => {
 }
 
 const getMouseMoveHandler = (
-  list: DragService,
+  list: OrderedListModel,
   onDragTo: (index: number) => void
 ) =>
   function handleMouseMove(event: Pick<MouseEvent, "clientX" | "clientY">) {
@@ -351,7 +349,7 @@ const getMouseMoveHandler = (
       ) {
         const element = list.elements[elementIndex]
 
-        if (element.dataset.rhahOrderableListId === list.draggingId) {
+        if (element.dataset.__rhahOrderedListId === list.draggingId) {
           continue
         }
 
@@ -361,7 +359,7 @@ const getMouseMoveHandler = (
         const isLastElement = elementIndex === list.maxElementIndex
         const isSecondToLast = elementIndex === list.maxElementIndex - 1
         const lastElementIsDetached =
-          list.elements[list.maxElementIndex].dataset.rhahOrderableListId ===
+          list.elements[list.maxElementIndex].dataset.__rhahOrderedListId ===
           list.draggingId
 
         const isLastPossibleElement =
@@ -399,14 +397,14 @@ const getMouseMoveHandler = (
       ) {
         const element = list.elements[elementIndex]
 
-        if (element.dataset.rhahOrderableListId === list.draggingId) {
+        if (element.dataset.__rhahOrderedListId === list.draggingId) {
           continue
         }
 
         const targetRect = list.getRect(element)
 
         const firstElementIsDetached =
-          list.elements[0].dataset.rhahOrderableListId === list.draggingId
+          list.elements[0].dataset.__rhahOrderedListId === list.draggingId
 
         const isLastPossibleElement =
           (elementIndex === 1 && firstElementIsDetached) || elementIndex === 0
@@ -565,12 +563,12 @@ const wouldOverlapBottom = (
   return false
 }
 
-type DraggingDragService = DragService & {
-  downAt: Exclude<DragService["downAt"], undefined>
-  downElement: Exclude<DragService["downElement"], undefined>
-  downRect: Exclude<DragService["downRect"], undefined>
+type DraggingDragService = OrderedListModel & {
+  downAt: Exclude<OrderedListModel["downAt"], undefined>
+  downElement: Exclude<OrderedListModel["downElement"], undefined>
+  downRect: Exclude<OrderedListModel["downRect"], undefined>
   isDragging: true
-  lastPoint: Exclude<DragService["lastPoint"], undefined>
+  lastPoint: Exclude<OrderedListModel["lastPoint"], undefined>
 }
 
 /**
@@ -578,7 +576,7 @@ type DraggingDragService = DragService & {
  * or not. Makes for fewer null checks.
  */
 function assertDragging(
-  list: DragService,
+  list: OrderedListModel,
   functionName: string
 ): asserts list is DraggingDragService {
   if (

@@ -2,10 +2,10 @@ import { styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
 import sortBy from "lodash/sortBy"
 import { useState } from "react"
-import { useOrderableList } from "./useOrderableList"
+import { useOrderedList } from "./useOrderedList"
 
 export default (
-  <Doc path="/Docs/useOrderableList">
+  <Doc path="/Docs/OrderedList">
     Useful for items that you want the user to put in order.
   </Doc>
 )
@@ -65,8 +65,9 @@ export const Basic = (
       const Following = ({ users: initialUsers }: FollowingProps) => {
         const [users, setUsers] = useState(initialUsers)
 
-        const { items, isPlaceholder, getItemProps, isLifted } =
-          useOrderableList(users, {
+        const { items, isPlaceholder, getItemProps, isLifted } = useOrderedList(
+          users,
+          {
             onOrderChange: (sortedIds) => {
               const sortedUsers = sortBy(initialUsers, (user) =>
                 sortedIds.indexOf(user.id)
@@ -74,7 +75,8 @@ export const Basic = (
               setUsers(sortedUsers)
             },
             dragOutIsAllowed: true,
-          })
+          }
+        )
 
         return (
           <>
