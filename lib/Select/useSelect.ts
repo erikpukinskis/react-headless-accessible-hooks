@@ -1,35 +1,29 @@
 import { useState, useEffect, useMemo } from "react"
-import { useFocusGroup } from "~/FocusGroup"
 
-type SelectOptions<ItemType> = {
+type SelectOptions<Datum> = {
   label: string
   onInputChange?: (value: string) => void
-  getOptionId: (item: ItemType) => string
-  onSelect?: (item: ItemType) => void
+  getOptionId: (item: Datum) => string
+  onSelect?: (item: Datum) => void
   minQueryLength?: number
 }
 
-export const useSelect = <ItemType>(
-  items: ItemType[] | undefined,
+export const useSelect = <Datum>(
+  items: Datum[] | undefined,
   {
     label,
     onInputChange,
     getOptionId,
     onSelect,
     minQueryLength = 1,
-  }: SelectOptions<ItemType>
+  }: SelectOptions<Datum>
 ) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
   const [query, setQuery] = useState("")
 
-  const { focusGroupProps, focus, blur } = useFocusGroup({
-    onBlur: () => setHidden(true),
-  })
-
   useEffect(
     function keepSelectionWithinResults() {
-      console.log("item length changed!")
       setHighlightedIndex(-1)
     },
     [items?.length]
@@ -45,8 +39,13 @@ export const useSelect = <ItemType>(
     [highlightedIndex, items, getOptionId]
   )
 
+  const selectItem = (item: Datum) => {
+    setHidden(true)
+    onSelect?.(item)
+    setQuery("")
+  }
+
   const handleKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    console.log("key", event.key, items?.length)
     if (event.key === "Escape") {
       setHidden(true)
       return
@@ -68,26 +67,23 @@ export const useSelect = <ItemType>(
       event.preventDefault()
     } else if (event.key === "Enter") {
       event.preventDefault()
-      const selectedItem = items[highlightedIndex]
-      setHidden(true)
-      blur("input")
-      onSelect?.(selectedItem)
+      selectItem(items[highlightedIndex])
     } else if (event.key === "ArrowUp") {
       event.preventDefault()
       if (highlightedIndex < 1) return
       setHighlightedIndex((index) => index - 1)
     } else if (event.key === "ArrowDown") {
       event.preventDefault()
-      console.log("down!", highlightedIndex)
+
+      if (isHidden) setHidden(false)
+
       if (highlightedIndex >= items.length - 1) return
+
       setHighlightedIndex((index) => {
-        console.log("was", index, "now", index + 1)
         return index + 1
       })
     }
   }
-
-  console.log("rendering", highlightedIndex)
 
   const handleInputChange = (event: React.ChangeEvent) => {
     if (!(event.target instanceof HTMLInputElement)) {
@@ -100,12 +96,27 @@ export const useSelect = <ItemType>(
     setHidden(false)
   }
 
-  const handleResultClick = () => {
-    setHidden(true)
-    blur("input")
+  const handleOptionClick = (index: number, event: React.MouseEvent) => {
+    event.preventDefault()
+
+    console.log("clicked", index)
+    if (!items) {
+      throw new Error(
+        `Clicked on Select item index ${index} but there are no items`
+      )
+    }
+    const item = items[index]
+
+    if (!item) {
+      throw new Error(
+        `Clicked on Select item index ${index} but there are only ${items.length} items`
+      )
+    }
+
+    selectItem(item)
   }
 
-  const isExpanded = (items: ItemType[] | undefined): items is ItemType[] => {
+  const isExpanded = (items: Datum[] | undefined): items is Datum[] => {
     return query.trim().length >= minQueryLength && Boolean(items) && !isHidden
   }
 
@@ -114,10 +125,11 @@ export const useSelect = <ItemType>(
     isExpanded: isExpanded(items),
     highlightedIndex,
     getInputProps: () => ({
-      ...focusGroupProps,
       "onChange": handleInputChange,
       "role": "combobox",
       "aria-expanded": isExpanded(items),
+      "onFocus": () => setHidden(false),
+      "onBlur": () => setHidden(true),
       "aria-activedescendant": activeDescendantId,
       "aria-label": label,
       "value": query,
@@ -129,18 +141,13 @@ export const useSelect = <ItemType>(
     }),
     getOptionProps: (index: number) => ({
       "role": "option",
-      ...focusGroupProps,
-      "onClick": handleResultClick,
+      "onMouseDown": handleOptionClick.bind(null, index),
       "onMouseOver": () => setHighlightedIndex(index),
       "aria-selected": highlightedIndex === index,
       "id": items ? getOptionId(items[index]) : undefined,
     }),
-    focus: () => {
-      focus("input")
-    },
     clear: () => {
       setQuery("")
-      focus("input")
     },
   }
 }
