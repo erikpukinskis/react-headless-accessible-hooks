@@ -54,13 +54,14 @@ function Template({ minQueryLength }: TemplateProps) {
 
   const [selectedId, setSelectedId] = useState<string | undefined>()
 
+  const [query, setQuery] = useState("")
+
   const {
     getInputProps,
     getListboxProps,
     getOptionProps,
     highlightedIndex,
     isExpanded,
-    query,
   } = useSelect({
     data,
     label: "Demo Select",
@@ -70,16 +71,26 @@ function Template({ minQueryLength }: TemplateProps) {
   })
 
   const matchingItems = useMemo(() => {
-    if (!query.trim()) return data
+    const q = query.trim()
+
+    if (q.length < minQueryLength) return []
+
+    if (!q) return data
 
     return data.filter((item) =>
       kebabCase(item.label).includes(kebabCase(query))
     )
-  }, [data, query])
+  }, [data, minQueryLength, query])
 
   return (
     <div>
-      <input type="text" placeholder="Search..." {...getInputProps()} />
+      <input
+        type="text"
+        placeholder="Search..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        {...getInputProps()}
+      />
       <br />
       Selected id: {selectedId ?? "undefined"}
       {isExpanded && (
