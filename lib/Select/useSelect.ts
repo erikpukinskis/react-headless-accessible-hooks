@@ -4,7 +4,7 @@ type SelectOptions<Datum> = {
   data?: Datum[]
   label: string
   onInputChange?: (value: string) => void
-  getOptionId: (item: Datum) => string
+  getOptionValue: (item: Datum) => string
   onSelect?: (item: Datum) => void
   minQueryLength?: number
 }
@@ -13,7 +13,7 @@ export const useSelect = <Datum>({
   data,
   label,
   onInputChange,
-  getOptionId,
+  getOptionValue,
   onSelect,
   minQueryLength = 1,
 }: SelectOptions<Datum>) => {
@@ -33,9 +33,9 @@ export const useSelect = <Datum>({
       if (highlightedIndex === -1) return undefined
       if (!data) return undefined
       if (data.length < 1) return undefined
-      return getOptionId(data[highlightedIndex])
+      return getOptionValue(data[highlightedIndex])
     },
-    [highlightedIndex, data, getOptionId]
+    [highlightedIndex, data, getOptionValue]
   )
 
   const selectItem = (item: Datum) => {
@@ -132,7 +132,7 @@ export const useSelect = <Datum>({
       "aria-activedescendant": activeDescendantId,
       "aria-label": label,
       "value": query,
-      "onKeyDown": handleKeys,
+      "onKeyDownCapture": handleKeys,
     }),
     getListboxProps: () => ({
       "role": "listbox",
@@ -143,7 +143,7 @@ export const useSelect = <Datum>({
       "onMouseDown": handleOptionClick.bind(null, index),
       "onMouseOver": () => setHighlightedIndex(index),
       "aria-selected": highlightedIndex === index,
-      "id": data ? getOptionId(data[index]) : undefined,
+      "id": data ? getOptionValue(data[index]) : undefined,
     }),
     clear: () => {
       setQuery("")
