@@ -77,22 +77,12 @@ export const useSelect = <Datum>({
     }
   }
 
-  const handleOptionClick = (index: number, event: React.MouseEvent) => {
+  const handleOptionClick = (item: Datum, event: React.MouseEvent) => {
+    // We prevent default because we don't want clicking on an option to steal
+    // the focus. If it did, you would end up in a situation where the search
+    // input loses focus which closes the menu, and the option is gone before
+    // the click on it can even register.
     event.preventDefault()
-
-    console.log("clicked", index)
-    if (!data) {
-      throw new Error(
-        `Clicked on Select item index ${index} but there are no items`
-      )
-    }
-    const item = data[index]
-
-    if (!item) {
-      throw new Error(
-        `Clicked on Select item index ${index} but there are only ${data.length} items`
-      )
-    }
 
     selectItem(item)
   }
@@ -101,28 +91,36 @@ export const useSelect = <Datum>({
     return Boolean(items) && !isHidden
   }
 
+  const isHighlighted = (item: Datum) => {
+    return item === data?.[highlightedIndex]
+  }
+
   return {
     isExpanded: isExpanded(data),
-    highlightedIndex,
+    isHighlighted,
     getInputProps: () => ({
       "role": "combobox",
       "aria-expanded": isExpanded(data),
       "onFocus": () => setHidden(false),
       "onBlur": () => setHidden(true),
       "aria-activedescendant": activeDescendantId,
-      "aria-label": label,
       "onKeyDownCapture": handleKeys,
     }),
     getListboxProps: () => ({
       "role": "listbox",
       "aria-label": label,
     }),
-    getOptionProps: (index: number) => ({
+    getOptionProps: (item: Datum) => ({
       "role": "option",
-      "onMouseDown": handleOptionClick.bind(null, index),
-      "onMouseOver": () => setHighlightedIndex(index),
-      "aria-selected": highlightedIndex === index,
-      "id": data ? getOptionValue(data[index]) : undefined,
+      "onMouseDown": handleOptionClick.bind(null, item),
+      "onMouseOver": () => {
+        if (!data) {
+          throw new Error("Moused over an option but there was no select data")
+        }
+        setHighlightedIndex(data.indexOf(item))
+      },
+      "aria-selected": isHighlighted(item),
+      "id": data ? getOptionValue(item) : undefined,
     }),
   }
 }
