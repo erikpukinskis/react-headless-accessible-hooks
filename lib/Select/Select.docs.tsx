@@ -64,7 +64,7 @@ function Template({ minQueryLength }: TemplateProps) {
   } = useSelect({
     data,
     label: "Demo Select",
-    getOptionId: (item) => item.id,
+    getOptionValue: (item) => item.id,
     onSelect: (item) => setSelectedId(item.id),
     minQueryLength,
   })
