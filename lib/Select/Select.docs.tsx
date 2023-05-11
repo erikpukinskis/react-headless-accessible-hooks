@@ -42,19 +42,31 @@ type TemplateProps = {
   minQueryLength: number
 }
 
-function Template({ minQueryLength }: TemplateProps) {
-  // Items can be any type. You just need to provide a getOptionId function
-  // that can return a unique string id for each option.
-  const [data] = useState([
-    { id: "one", label: "First Item" },
-    { id: "two", label: "Second Item" },
-    { id: "three", label: "Third Item" },
-    { id: "four", label: "Fourth Item" },
-  ])
+// Items can be any type. You just need to provide a getOptionId function
+// that can return a unique string id for each option.
+const ITEMS = [
+  { id: "one", label: "First Item" },
+  { id: "two", label: "Second Item" },
+  { id: "three", label: "Third Item" },
+  { id: "four", label: "Fourth Item" },
+]
 
+function Template({ minQueryLength }: TemplateProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>()
 
   const [query, setQuery] = useState("")
+
+  const matchingItems = useMemo(() => {
+    const q = query.trim()
+
+    if (q.length < minQueryLength) return []
+
+    if (!q) return ITEMS
+
+    return ITEMS.filter((item) =>
+      kebabCase(item.label).includes(kebabCase(query))
+    )
+  }, [minQueryLength, query])
 
   const {
     getInputProps,
@@ -63,23 +75,11 @@ function Template({ minQueryLength }: TemplateProps) {
     isHighlighted,
     isExpanded,
   } = useSelect({
-    data,
+    data: matchingItems,
     label: "Items",
     getOptionValue: (item) => item.id,
     onSelect: (item) => setSelectedId(item.id),
   })
-
-  const matchingItems = useMemo(() => {
-    const q = query.trim()
-
-    if (q.length < minQueryLength) return []
-
-    if (!q) return data
-
-    return data.filter((item) =>
-      kebabCase(item.label).includes(kebabCase(query))
-    )
-  }, [data, minQueryLength, query])
 
   return (
     <div>

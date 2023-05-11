@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 
 type SelectOptions<Datum> = {
   data?: Datum[]
@@ -17,9 +17,14 @@ export const useSelect = <Datum>({
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
+  const inputIsFocusedRef = useRef(false)
 
   useEffect(() => {
     setHighlightedIndex(0)
+
+    if (inputIsFocusedRef.current) {
+      setHidden(false)
+    }
   }, [data])
 
   const activeDescendantId = useMemo(
@@ -101,8 +106,14 @@ export const useSelect = <Datum>({
     getInputProps: () => ({
       "role": "combobox",
       "aria-expanded": isExpanded(data),
-      "onFocus": () => setHidden(false),
-      "onBlur": () => setHidden(true),
+      "onFocus": () => {
+        inputIsFocusedRef.current = true
+        setHidden(false)
+      },
+      "onBlur": () => {
+        inputIsFocusedRef.current = false
+        setHidden(true)
+      },
       "aria-activedescendant": activeDescendantId,
       "onKeyDownCapture": handleKeys,
     }),
