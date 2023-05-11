@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react"
 
 type SelectOptions<Datum> = {
+  data?: Datum[]
   label: string
   onInputChange?: (value: string) => void
   getOptionId: (item: Datum) => string
@@ -8,16 +9,14 @@ type SelectOptions<Datum> = {
   minQueryLength?: number
 }
 
-export const useSelect = <Datum>(
-  items: Datum[] | undefined,
-  {
-    label,
-    onInputChange,
-    getOptionId,
-    onSelect,
-    minQueryLength = 1,
-  }: SelectOptions<Datum>
-) => {
+export const useSelect = <Datum>({
+  data,
+  label,
+  onInputChange,
+  getOptionId,
+  onSelect,
+  minQueryLength = 1,
+}: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
   const [query, setQuery] = useState("")
@@ -26,17 +25,17 @@ export const useSelect = <Datum>(
     function keepSelectionWithinResults() {
       setHighlightedIndex(-1)
     },
-    [items?.length]
+    [data?.length]
   )
 
   const activeDescendantId = useMemo(
     function updateActiveDescendant() {
       if (highlightedIndex === -1) return undefined
-      if (!items) return undefined
-      if (items.length < 1) return undefined
-      return getOptionId(items[highlightedIndex])
+      if (!data) return undefined
+      if (data.length < 1) return undefined
+      return getOptionId(data[highlightedIndex])
     },
-    [highlightedIndex, items, getOptionId]
+    [highlightedIndex, data, getOptionId]
   )
 
   const selectItem = (item: Datum) => {
@@ -51,7 +50,7 @@ export const useSelect = <Datum>(
       return
     }
 
-    if (!items || items.length < 1) return
+    if (!data || data.length < 1) return
 
     if (
       event.key === "PageUp" ||
@@ -63,11 +62,11 @@ export const useSelect = <Datum>(
       event.key === "PageDown" ||
       (event.key === "ArrowRight" && event.metaKey)
     ) {
-      setHighlightedIndex(items.length - 1)
+      setHighlightedIndex(data.length - 1)
       event.preventDefault()
     } else if (event.key === "Enter") {
       event.preventDefault()
-      selectItem(items[highlightedIndex])
+      selectItem(data[highlightedIndex])
     } else if (event.key === "ArrowUp") {
       event.preventDefault()
       if (highlightedIndex < 1) return
@@ -77,7 +76,7 @@ export const useSelect = <Datum>(
 
       if (isHidden) setHidden(false)
 
-      if (highlightedIndex >= items.length - 1) return
+      if (highlightedIndex >= data.length - 1) return
 
       setHighlightedIndex((index) => {
         return index + 1
@@ -100,16 +99,16 @@ export const useSelect = <Datum>(
     event.preventDefault()
 
     console.log("clicked", index)
-    if (!items) {
+    if (!data) {
       throw new Error(
         `Clicked on Select item index ${index} but there are no items`
       )
     }
-    const item = items[index]
+    const item = data[index]
 
     if (!item) {
       throw new Error(
-        `Clicked on Select item index ${index} but there are only ${items.length} items`
+        `Clicked on Select item index ${index} but there are only ${data.length} items`
       )
     }
 
@@ -122,12 +121,12 @@ export const useSelect = <Datum>(
 
   return {
     query,
-    isExpanded: isExpanded(items),
+    isExpanded: isExpanded(data),
     highlightedIndex,
     getInputProps: () => ({
       "onChange": handleInputChange,
       "role": "combobox",
-      "aria-expanded": isExpanded(items),
+      "aria-expanded": isExpanded(data),
       "onFocus": () => setHidden(false),
       "onBlur": () => setHidden(true),
       "aria-activedescendant": activeDescendantId,
@@ -144,7 +143,7 @@ export const useSelect = <Datum>(
       "onMouseDown": handleOptionClick.bind(null, index),
       "onMouseOver": () => setHighlightedIndex(index),
       "aria-selected": highlightedIndex === index,
-      "id": items ? getOptionId(items[index]) : undefined,
+      "id": data ? getOptionId(data[index]) : undefined,
     }),
     clear: () => {
       setQuery("")
