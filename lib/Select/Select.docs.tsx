@@ -60,14 +60,13 @@ function Template({ minQueryLength }: TemplateProps) {
     getInputProps,
     getListboxProps,
     getOptionProps,
-    highlightedIndex,
+    isHighlighted,
     isExpanded,
   } = useSelect({
     data,
-    label: "Demo Select",
+    label: "Items",
     getOptionValue: (item) => item.id,
     onSelect: (item) => setSelectedId(item.id),
-    minQueryLength,
   })
 
   const matchingItems = useMemo(() => {
@@ -89,17 +88,18 @@ function Template({ minQueryLength }: TemplateProps) {
         placeholder="Search..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        aria-label="Search items"
         {...getInputProps()}
       />
       <br />
       Selected id: {selectedId ?? "undefined"}
       {isExpanded && (
         <div {...getListboxProps()}>
-          {matchingItems.map((item, index) => (
+          {matchingItems.map((item) => (
             <SelectItem
               key={item.id}
-              {...getOptionProps(index)}
-              highlighted={index === highlightedIndex}
+              {...getOptionProps(item)}
+              highlighted={isHighlighted(item)}
             >
               {item.label}
             </SelectItem>
