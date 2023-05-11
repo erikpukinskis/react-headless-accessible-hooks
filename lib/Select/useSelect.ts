@@ -28,6 +28,10 @@ export const useSelect = <Datum>({
     [data?.length]
   )
 
+  useEffect(() => {
+    setHighlightedIndex(0)
+  }, [query])
+
   const activeDescendantId = useMemo(
     function updateActiveDescendant() {
       if (highlightedIndex === -1) return undefined
