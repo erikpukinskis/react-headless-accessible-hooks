@@ -1,2 +1,2 @@
 export { useOrderedTree, useOrderedTreeNode } from "./OrderedTree"
-export { useSelect, useAutocomplete } from "./Select"
+export { useSelect, useAutocomplete, isAddOption } from "./Select"
