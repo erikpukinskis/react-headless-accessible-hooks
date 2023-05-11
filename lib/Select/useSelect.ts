@@ -12,25 +12,15 @@ type SelectOptions<Datum> = {
 export const useSelect = <Datum>({
   data,
   label,
-  onInputChange,
   getOptionValue,
   onSelect,
-  minQueryLength = 1,
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
-  const [query, setQuery] = useState("")
-
-  useEffect(
-    function keepSelectionWithinResults() {
-      setHighlightedIndex(-1)
-    },
-    [data?.length]
-  )
 
   useEffect(() => {
     setHighlightedIndex(0)
-  }, [query])
+  }, [data])
 
   const activeDescendantId = useMemo(
     function updateActiveDescendant() {
@@ -45,7 +35,6 @@ export const useSelect = <Datum>({
   const selectItem = (item: Datum) => {
     setHidden(true)
     onSelect?.(item)
-    setQuery("")
   }
 
   const handleKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -88,17 +77,6 @@ export const useSelect = <Datum>({
     }
   }
 
-  const handleInputChange = (event: React.ChangeEvent) => {
-    if (!(event.target instanceof HTMLInputElement)) {
-      throw new Error(
-        "useSelect input change target was not an HTMLInputElement?"
-      )
-    }
-    setQuery(event.target.value)
-    onInputChange?.(event.target.value)
-    setHidden(false)
-  }
-
   const handleOptionClick = (index: number, event: React.MouseEvent) => {
     event.preventDefault()
 
@@ -120,22 +98,19 @@ export const useSelect = <Datum>({
   }
 
   const isExpanded = (items: Datum[] | undefined): items is Datum[] => {
-    return query.trim().length >= minQueryLength && Boolean(items) && !isHidden
+    return Boolean(items) && !isHidden
   }
 
   return {
-    query,
     isExpanded: isExpanded(data),
     highlightedIndex,
     getInputProps: () => ({
-      "onChange": handleInputChange,
       "role": "combobox",
       "aria-expanded": isExpanded(data),
       "onFocus": () => setHidden(false),
       "onBlur": () => setHidden(true),
       "aria-activedescendant": activeDescendantId,
       "aria-label": label,
-      "value": query,
       "onKeyDownCapture": handleKeys,
     }),
     getListboxProps: () => ({
@@ -149,8 +124,5 @@ export const useSelect = <Datum>({
       "aria-selected": highlightedIndex === index,
       "id": data ? getOptionValue(data[index]) : undefined,
     }),
-    clear: () => {
-      setQuery("")
-    },
   }
 }
