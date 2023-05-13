@@ -271,10 +271,14 @@ describe("buildTree", () => {
     ).toBeCloseTo(0.1666)
   })
 
-  it("throws when there are no root nodes", () => {
-    expect(() => {
-      buildTree({ data: [AUNTIE, MOMMA, GRANDKID], ...FUNCTIONS })
-    }).toThrow("Every node in the tree had a parent")
+  it.only("moves nodes to the root if their parent is not present", () => {
+    const tree = buildTree({ data: [AUNTIE, MOMMA, GRANDKID], ...FUNCTIONS })
+
+    expect(tree.roots).toHaveLength(2)
+    expect(tree.roots[0].id).toBe("auntie")
+    expect(tree.roots[1].id).toBe("momma")
+    expect(tree.roots[1].children).toHaveLength(1)
+    expect(tree.roots[1].children[0].id).toBe("grandkid")
   })
 
   it("rebuilds indexes with a node collapsed", () => {

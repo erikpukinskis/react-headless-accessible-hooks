@@ -35,18 +35,6 @@ export function buildTree<Datum>({
   const nodesById: Record<string, OrderedTreeNode<Datum>> = {}
   const indexesById: Record<string, number> = {}
 
-  if (data.length > 0 && rootData.length < 1) {
-    if (import.meta.env.MODE !== "test") {
-      console.log(JSON.stringify(data, null, 4).slice(0, 500))
-    }
-
-    throw new Error(
-      "Every node in the tree had a parent... there should be at least one root node?"
-    )
-  }
-
-  // OK here we probably need to be returning other stuff here instead of nodes
-
   const {
     nodes: roots,
     missingOrdersById,
