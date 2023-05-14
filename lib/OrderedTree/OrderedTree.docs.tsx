@@ -1,8 +1,11 @@
 import { keyframes, styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
-import React, { useState } from "react"
+import { kebabCase } from "lodash"
+import React, { useCallback, useState } from "react"
+import type { UseOrderedTreeArgs } from "./useOrderedTree"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import { useDumpDebugData } from "~/Debug"
+import { buildKin } from "~/kin"
 
 export default (
   <Doc path="/Docs/OrderedTree">
@@ -81,35 +84,83 @@ const ORPHANS = [AUNTIE, MOMMA, TIO].map((sibling) => ({
   isCollapsed: false,
 }))
 
-export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
+// export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
 
 const toRootNode = (kin: Kin) => ({ ...kin, parentId: null })
 
-export const WithChild = (
+// export const WithChild = (
+//   <Demo
+//     render={Template}
+//     props={{
+//       data: [
+//         { ...toRootNode(MOMMA), order: 0.2 },
+//         KIDDO,
+//         { ...toRootNode(AUNTIE), order: 0.4 },
+//       ],
+//     }}
+//   />
+// )
+
+// export const WithCollapsedNode = (
+//   <Demo
+//     render={Template}
+//     props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
+//   />
+// )
+
+export const Searchable = (
   <Demo
-    render={Template}
-    props={{
-      data: [
-        { ...toRootNode(MOMMA), order: 0.2 },
-        KIDDO,
-        { ...toRootNode(AUNTIE), order: 0.4 },
-      ],
+    render={() => {
+      const [query, setQuery] = useState("")
+
+      const isFilteredOut = useCallback(
+        (kin: Kin) => {
+          console.log("running filter")
+          if (!query.trim()) return false
+
+          const doesMatch = kebabCase(kin.name).includes(
+            kebabCase(query.trim())
+          )
+          console.log(kin.name, doesMatch ? "matches" : "does not match", query)
+
+          return !doesMatch
+        },
+        [query]
+      )
+
+      return (
+        <div>
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search..."
+          />
+          <Template
+            isFilteredOut={isFilteredOut}
+            data={[
+              buildKin({ id: "bananas" }),
+              buildKin({ id: "green-banana", parentId: "bananas" }),
+              buildKin({ id: "overripe-banana", parentId: "bananas" }),
+              buildKin({ id: "cereals" }),
+              buildKin({ id: "honey-nut-cheeorios", parentId: "cereals" }),
+              buildKin({ id: "cheeorios", parentId: "cereals" }),
+              buildKin({ id: "banana pops", parentId: "cereals" }),
+            ]}
+          />
+        </div>
+      )
     }}
   />
 )
 
-export const WithCollapsedNode = (
-  <Demo
-    render={Template}
-    props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
-  />
-)
+type OrderedTreeOverrides<Datum> = Partial<UseOrderedTreeArgs<Datum>> &
+  Pick<UseOrderedTreeArgs<Datum>, "data">
 
-type TemplateProps = {
-  data: Kin[]
-}
-
-function Template({ data: initialData }: TemplateProps) {
+function Template({
+  data: initialData,
+  ...overrides
+}: OrderedTreeOverrides<Kin>) {
   const [data, setData] = useState(initialData)
 
   const dump = useDumpDebugData()
@@ -171,6 +222,7 @@ function Template({ data: initialData }: TemplateProps) {
       },
       isCollapsed: (kin) => kin.isCollapsed,
       dump,
+      ...overrides,
     })
 
   return (

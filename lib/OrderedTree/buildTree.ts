@@ -1,19 +1,19 @@
-import { orderBy } from "lodash"
+import { compact, orderBy } from "lodash"
 import { assert } from "~/helpers"
 
 export type DatumFunctions<Datum> = {
-  getParentId(datum: Datum): string | null
-  getId(datum: Datum): string
-  getOrder(datum: Datum): number | null
-  compare(a: Datum, b: Datum): number
-  isCollapsed(datum: Datum): boolean
+  getParentId(this: void, datum: Datum): string | null
+  getId(this: void, datum: Datum): string
+  getOrder(this: void, datum: Datum): number | null
+  compare(this: void, a: Datum, b: Datum): number
+  isCollapsed(this: void, datum: Datum): boolean
+  isFilteredOut?(this: void, datum: Datum): boolean
 }
 
 export type OrderedTreeBuild<Datum> = {
   roots: OrderedTreeNode<Datum>[]
   rootData: Datum[]
   treeSize: number
-  // orphans: OrderedTreeNode<Datum>[]
   missingOrdersById: Record<string, number>
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   nodesById: Record<string, OrderedTreeNode<Datum>>
@@ -22,24 +22,29 @@ export type OrderedTreeBuild<Datum> = {
 
 type buildTreeArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
+  isFilteredOut?(datum: Datum): boolean
 }
 
 export function buildTree<Datum>({
   data,
+  isFilteredOut,
   ...datumFunctions
 }: buildTreeArgs<Datum>): OrderedTreeBuild<Datum> {
   console.log("Building tree")
 
-  const rootData = data.filter((datum) => !datumFunctions.getParentId(datum))
+  const rootData = findRoots(
+    data,
+    datumFunctions.getId,
+    datumFunctions.getParentId
+  )
+
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
   const nodesById: Record<string, OrderedTreeNode<Datum>> = {}
   const indexesById: Record<string, number> = {}
 
-  const {
-    nodes: roots,
-    missingOrdersById,
-    nextIndex,
-  } = buildSiblingNodes({
+  const { nodes, missingOrdersById, nextIndex } = buildSiblingNodes({
+    isFilteredOut,
+    parentIsFilteredIn: false,
     siblings: rootData,
     ...datumFunctions,
     data,
@@ -49,6 +54,14 @@ export function buildTree<Datum>({
     indexesById,
     parents: [],
   })
+
+  const roots = isFilteredOut
+    ? nodes.filter((node) => {
+        // If the node has children, it means one of the children matches the filter, so we keep the parent
+        if (node.children.length > 0) return true
+        return !isFilteredOut(node.data)
+      })
+    : nodes
 
   const build: OrderedTreeBuild<Datum> = {
     roots,
@@ -61,6 +74,20 @@ export function buildTree<Datum>({
   }
 
   return build
+}
+
+function findRoots<Datum>(
+  data: Datum[],
+  getId: (datum: Datum) => string,
+  getParentId: (datum: Datum) => string | null
+) {
+  const ids = data.map(getId)
+
+  return data.filter((datum) => {
+    const parentId = getParentId(datum)
+
+    return parentId === null || !ids.includes(parentId)
+  })
 }
 
 export type OrderedTreeNode<Datum> = {
@@ -78,6 +105,7 @@ type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
   nodesById: Record<string, OrderedTreeNode<Datum>>
   indexesById: Record<string, number>
   parents: OrderedTreeNode<Datum>[]
+  parentIsFilteredIn: boolean
 }
 
 function buildSiblingNodes<Datum>({
@@ -88,6 +116,8 @@ function buildSiblingNodes<Datum>({
   compare,
   getParentId,
   isCollapsed,
+  isFilteredOut = () => false,
+  parentIsFilteredIn = false,
   nextIndex,
   nodesByIndex,
   indexesById,
@@ -106,10 +136,12 @@ function buildSiblingNodes<Datum>({
 
   const nodes = orderedSiblings.map(function buildNode(
     datum
-  ): OrderedTreeNode<Datum> {
-    const childData = data.filter(
-      (possibleChild) => getParentId(possibleChild) === getId(datum)
-    )
+  ): OrderedTreeNode<Datum> | undefined {
+    const childData = data.filter((possibleChild) => {
+      if (getParentId(possibleChild) !== getId(datum)) return false
+      if (isFilteredOut(possibleChild) && !parentIsFilteredIn) return false
+      return true
+    })
 
     const nodeIndex = nextIndex
 
@@ -131,6 +163,7 @@ function buildSiblingNodes<Datum>({
         nextIndex: newNextIndex,
       } = buildSiblingNodes({
         siblings: childData,
+        parentIsFilteredIn: true,
         data,
         getParentId,
         getId,
@@ -160,7 +193,7 @@ function buildSiblingNodes<Datum>({
   })
 
   return {
-    nodes,
+    nodes: compact(nodes),
     missingOrdersById,
     nextIndex,
   }

@@ -53,6 +53,7 @@ export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   onNodeMove(id: string, newOrder: number, newParentId: string | null): void
   onClick?(datum: Datum): void
   onBulkNodeOrder(ordersById: Record<string, number>): void
+  isFilteredOut?(datum: Datum): boolean
   dump?: DebugDataDumper
 }
 
@@ -83,6 +84,7 @@ export function useOrderedTree<Datum>({
   getOrder,
   compare,
   isCollapsed,
+  isFilteredOut,
 
   // Callbacks
   dump,
@@ -101,9 +103,10 @@ export function useOrderedTree<Datum>({
       getOrder,
       compare,
       isCollapsed,
+      isFilteredOut,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [isFilteredOut]
   )
 
   const [tree, setTree] = useState(() =>
@@ -112,6 +115,12 @@ export function useOrderedTree<Datum>({
       ...datumFunctions,
     })
   )
+
+  useEffect(() => {
+    if (isEmpty(tree.missingOrdersById)) return
+
+    bulkOrderRef.current(tree.missingOrdersById)
+  }, [tree])
 
   const [model] = useState(
     () =>
@@ -128,6 +137,28 @@ export function useOrderedTree<Datum>({
         collapseNode: () => {},
         expandNode: () => {},
       })
+  )
+
+  const isFirstRenderRef = useRef(true)
+
+  useEffect(
+    function rebuildTree() {
+      console.log("rebuilding tree")
+      if (isFirstRenderRef.current) {
+        // We don't need to rebuild the tree on the first render
+        isFirstRenderRef.current = false
+        return
+      }
+
+      const newTree = buildTree({
+        data,
+        ...datumFunctions,
+      })
+
+      setTree(newTree)
+      model.setTree(newTree)
+    },
+    [data, model, datumFunctions]
   )
 
   const [TreeProvider] = useState(
@@ -152,30 +183,6 @@ export function useOrderedTree<Datum>({
     model,
     false
   )
-
-  const isFirstRenderRef = useRef(true)
-
-  useEffect(() => {
-    if (isFirstRenderRef.current) {
-      // We don't need to rebuild the tree on the first render
-      isFirstRenderRef.current = false
-      return
-    }
-
-    const newTree = buildTree({
-      data,
-      ...datumFunctions,
-    })
-
-    setTree(newTree)
-    model.setTree(newTree)
-  }, [data, model, datumFunctions])
-
-  useEffect(() => {
-    if (isEmpty(tree.missingOrdersById)) return
-
-    bulkOrderRef.current(tree.missingOrdersById)
-  }, [tree])
 
   const observedNodeRef = useRef<HTMLElement | null>(null)
   const [treeObserver] = useState(
