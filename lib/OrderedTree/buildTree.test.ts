@@ -281,7 +281,7 @@ describe("buildTree", () => {
     expect(tree.roots[1].id).toBe("auntie")
   })
 
-  it.only("filters out node trees", () => {
+  it("filters out node trees", () => {
     const tree = buildTree({
       data: [AUNTIE, MOMMA, GRANDKID],
       ...FUNCTIONS,
@@ -290,6 +290,19 @@ describe("buildTree", () => {
 
     expect(tree.roots).toHaveLength(1)
     expect(tree.roots[0].id).toBe("auntie")
+  })
+
+  it("includes children of nodes that match filters", () => {
+    const tree = buildTree({
+      data: [AUNTIE, MOMMA, GRANDKID],
+      ...FUNCTIONS,
+      isFilteredOut: (kin) => kin.id === "auntie",
+    })
+
+    expect(tree.roots).toHaveLength(1)
+    expect(tree.roots[0].id).toBe("momma")
+    expect(tree.roots[0].children).toHaveLength(1)
+    expect(tree.roots[0].children[0].id).toBe("grandkid")
   })
 
   it("rebuilds indexes with a node collapsed", () => {

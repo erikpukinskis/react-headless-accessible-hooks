@@ -116,8 +116,8 @@ function buildSiblingNodes<Datum>({
   compare,
   getParentId,
   isCollapsed,
-  isFilteredOut = () => false,
-  parentIsFilteredIn = false,
+  isFilteredOut,
+  parentIsFilteredIn,
   nextIndex,
   nodesByIndex,
   indexesById,
@@ -137,9 +137,13 @@ function buildSiblingNodes<Datum>({
   const nodes = orderedSiblings.map(function buildNode(
     datum
   ): OrderedTreeNode<Datum> | undefined {
+    const thisNodeIsFilteredIn =
+      parentIsFilteredIn || !isFilteredOut || !isFilteredOut(datum)
+
     const childData = data.filter((possibleChild) => {
       if (getParentId(possibleChild) !== getId(datum)) return false
-      if (isFilteredOut(possibleChild) && !parentIsFilteredIn) return false
+      if (!isFilteredOut) return true
+      if (isFilteredOut(possibleChild) && !thisNodeIsFilteredIn) return false
       return true
     })
 
@@ -163,7 +167,7 @@ function buildSiblingNodes<Datum>({
         nextIndex: newNextIndex,
       } = buildSiblingNodes({
         siblings: childData,
-        parentIsFilteredIn: true,
+        parentIsFilteredIn: thisNodeIsFilteredIn,
         data,
         getParentId,
         getId,
