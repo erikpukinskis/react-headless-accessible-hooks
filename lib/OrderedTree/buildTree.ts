@@ -7,7 +7,7 @@ export type DatumFunctions<Datum> = {
   getOrder(this: void, datum: Datum): number | null
   compare(this: void, a: Datum, b: Datum): number
   isCollapsed(this: void, datum: Datum): boolean
-  isFilteredOut?(this: void, datum: Datum): boolean
+  isFilteredOut?(this: void, datum: Datum): boolean | undefined
 }
 
 export type OrderedTreeBuild<Datum> = {
@@ -21,9 +21,8 @@ export type OrderedTreeBuild<Datum> = {
   indexesById: Record<string, number>
 }
 
-type buildTreeArgs<Datum> = DatumFunctions<Datum> & {
+type BuildTreeArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
-  isFilteredOut?(datum: Datum): boolean
   userControlledExpansionIds: string[]
 }
 
@@ -32,7 +31,7 @@ export function buildTree<Datum>({
   isFilteredOut,
   userControlledExpansionIds,
   ...datumFunctions
-}: buildTreeArgs<Datum>): OrderedTreeBuild<Datum> {
+}: BuildTreeArgs<Datum>): OrderedTreeBuild<Datum> {
   console.log("Building tree")
 
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
@@ -87,17 +86,19 @@ export function buildTree<Datum>({
   return build
 }
 
+type PrebuildTreeArgs<Datum> = Pick<
+  DatumFunctions<Datum>,
+  "isFilteredOut" | "getParentId" | "getId"
+> & {
+  data: Datum[]
+}
+
 export function prebuildTree<Datum>({
   data,
   isFilteredOut,
   getParentId,
   getId,
-}: {
-  data: Datum[]
-  isFilteredOut?: (datum: Datum) => boolean
-  getParentId: (datum: Datum) => string | null
-  getId: (datum: Datum) => string
-}) {
+}: PrebuildTreeArgs<Datum>) {
   const dataById = keyBy(data, getId)
   const hasChildrenFilteredIn: Record<string, boolean> = {}
 

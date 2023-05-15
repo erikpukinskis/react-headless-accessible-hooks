@@ -53,7 +53,7 @@ export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   onNodeMove(id: string, newOrder: number, newParentId: string | null): void
   onClick?(datum: Datum): void
   onBulkNodeOrder(ordersById: Record<string, number>): void
-  isFilteredOut?(datum: Datum): boolean
+  isFilteredOut?(datum: Datum): boolean | undefined
   dump?: DebugDataDumper
 }
 
@@ -145,10 +145,14 @@ export function useOrderedTree<Datum>({
     () =>
       new OrderedTreeModel({
         tree: tree,
-        getParentId,
-        getOrder,
-        getId,
-        isCollapsed,
+        functions: {
+          getParentId,
+          getOrder,
+          getId,
+          isCollapsed,
+          isFilteredOut,
+          compare,
+        },
         expansionOverrides,
         dump,
         onNodeMove,
@@ -161,9 +165,19 @@ export function useOrderedTree<Datum>({
 
   const isFirstRenderRef = useRef(true)
 
+  useEffect(() => {
+    model.setFunctions({
+      getParentId,
+      getOrder,
+      getId,
+      isCollapsed,
+      isFilteredOut,
+      compare,
+    })
+  }, [model, getParentId, getOrder, getId, isCollapsed, isFilteredOut, compare])
+
   useEffect(
     function rebuildTree() {
-      console.log("rebuilding tree")
       if (isFirstRenderRef.current) {
         // We don't need to rebuild the tree on the first render
         isFirstRenderRef.current = false
@@ -289,13 +303,14 @@ export function TreeProvider<Datum>({
 
 type UseOrderedTreeNodeReturnType<Datum> = {
   children: Datum[]
-  getNodeProps: GetNodeProps
   depth: number
+  expansion: "expanded" | "collapsed" | "no children"
+  getNodeProps: GetNodeProps
+  getKey: (datum: Datum) => string
+  isPlaceholder: boolean
   isBeingDragged: boolean
   hasChildren: boolean
-  expansion: "expanded" | "collapsed" | "no children"
-  isPlaceholder: boolean
-  getKey: (datum: Datum) => string
+  doesMatch: boolean
 }
 
 export function useOrderedTreeNode<Datum>(
@@ -337,15 +352,18 @@ export function useOrderedTreeNode<Datum>(
 
   const getKey = useCallback((datum: Datum) => model.getKey(datum), [model])
 
+  const doesMatch = model.doesMatch(datum)
+
   return {
     children,
     expansion,
-    getNodeProps,
     depth,
+    getNodeProps,
+    getKey,
     isBeingDragged,
     isPlaceholder,
     hasChildren,
-    getKey,
+    doesMatch,
   }
 }
 
@@ -381,7 +399,7 @@ function useParent<Datum>(
     }
     if (!Object.prototype.hasOwnProperty.call(parent, "__isRhahPlaceholder")) {
       throw new Error(
-        `Tried to use placeholder parent, but datum with id ${model.data.getId(
+        `Tried to use placeholder parent, but datum with id ${model.functions.getId(
           parent
         )} wasn't tagged as a placeholder`
       )
@@ -407,7 +425,7 @@ function useParent<Datum>(
     }))
   }, [model, parent])
 
-  const parentId = parent ? model.data.getId(parent) : null
+  const parentId = parent ? model.functions.getId(parent) : null
 
   useEffect(() => {
     if (isPlaceholder) return
@@ -461,7 +479,11 @@ function useParent<Datum>(
         }
 
         const siblings = removeId
-          ? removeSibling([...originalChildren], removeId, model.data.getId)
+          ? removeSibling(
+              [...originalChildren],
+              removeId,
+              model.functions.getId
+            )
           : [...originalChildren]
 
         const data = spliceSibling({
@@ -477,7 +499,11 @@ function useParent<Datum>(
       }
 
       if (removeId !== undefined) {
-        return removeSibling([...originalChildren], removeId, model.data.getId)
+        return removeSibling(
+          [...originalChildren],
+          removeId,
+          model.functions.getId
+        )
       }
 
       return originalChildren

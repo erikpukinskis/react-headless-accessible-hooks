@@ -115,13 +115,11 @@ export const Searchable = (
 
       const isFilteredOut = useCallback(
         (kin: Kin) => {
-          console.log("running filter")
-          if (!query.trim()) return false
+          if (!query.trim()) return undefined
 
           const doesMatch = kebabCase(kin.name).includes(
             kebabCase(query.trim())
           )
-          console.log(kin.name, doesMatch ? "matches" : "does not match", query)
 
           return !doesMatch
         },
@@ -146,6 +144,8 @@ export const Searchable = (
               buildKin({ id: "honey-nut-cheerios", parentId: "cereals" }),
               buildKin({ id: "cheerios", parentId: "cereals" }),
               buildKin({ id: "banana pops", parentId: "cereals" }),
+              buildKin({ id: "flakes", parentId: "cereals" }),
+              buildKin({ id: "corn flakes", parentId: "flakes" }),
             ]}
           />
         </div>
@@ -330,6 +330,7 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     depth,
     isPlaceholder,
     isBeingDragged,
+    doesMatch,
     expansion,
     getKey,
   } = useOrderedTreeNode(kin)
@@ -343,17 +344,21 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     )
   }
 
+  const style: React.CSSProperties = {
+    background: doesMatch ? "yellow" : undefined,
+  }
+
+  if (expansion !== "no children") {
+    style.fontWeight = 500
+  }
+
   return (
     <>
       <DraggableRow {...getNodeProps()} isBeingDragged={isBeingDragged}>
         {isBeingDragged || (
           <DepthIndicator id={kin.id} depth={depth} expansion={expansion} />
         )}
-        <span
-          style={expansion === "no children" ? undefined : { fontWeight: 500 }}
-        >
-          {kin.name}
-        </span>
+        <span style={style}>{kin.name}</span>
       </DraggableRow>
       {children.map((child) => (
         <TreeRows key={getKey(child)} kin={child} />
