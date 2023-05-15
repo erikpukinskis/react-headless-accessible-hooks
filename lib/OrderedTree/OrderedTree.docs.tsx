@@ -142,7 +142,7 @@ export const Searchable = (
               buildKin({ id: "bananas" }),
               buildKin({ id: "green-banana", parentId: "bananas" }),
               buildKin({ id: "overripe-banana", parentId: "bananas" }),
-              buildKin({ id: "cereals" }),
+              buildKin({ id: "cereals", isCollapsed: true }),
               buildKin({ id: "honey-nut-cheerios", parentId: "cereals" }),
               buildKin({ id: "cheerios", parentId: "cereals" }),
               buildKin({ id: "banana pops", parentId: "cereals" }),

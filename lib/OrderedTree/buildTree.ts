@@ -1,4 +1,4 @@
-import { compact, orderBy } from "lodash"
+import { compact, keyBy, orderBy } from "lodash"
 import { assert } from "~/helpers"
 
 export type DatumFunctions<Datum> = {
@@ -15,6 +15,7 @@ export type OrderedTreeBuild<Datum> = {
   rootData: Datum[]
   treeSize: number
   missingOrdersById: Record<string, number>
+  expansionOverrides: Record<string, "expanded" | "collapsed">
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   nodesById: Record<string, OrderedTreeNode<Datum>>
   indexesById: Record<string, number>
@@ -23,30 +24,47 @@ export type OrderedTreeBuild<Datum> = {
 type buildTreeArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
   isFilteredOut?(datum: Datum): boolean
+  userControlledExpansionIds: string[]
 }
 
 export function buildTree<Datum>({
   data,
   isFilteredOut,
+  userControlledExpansionIds,
   ...datumFunctions
 }: buildTreeArgs<Datum>): OrderedTreeBuild<Datum> {
   console.log("Building tree")
-
-  const rootData = findRoots(
-    data,
-    datumFunctions.getId,
-    datumFunctions.getParentId
-  )
 
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
   const nodesById: Record<string, OrderedTreeNode<Datum>> = {}
   const indexesById: Record<string, number> = {}
 
+  const { hasChildrenFilteredIn, rootData, temporaryExpansionOverrides } =
+    prebuildTree({
+      data,
+      isFilteredOut,
+      getParentId: datumFunctions.getParentId,
+      getId: datumFunctions.getId,
+    })
+
+  const isCollapsed = (datum: Datum) => {
+    const id = datumFunctions.getId(datum)
+
+    if (
+      userControlledExpansionIds.includes(id) ||
+      !temporaryExpansionOverrides[id]
+    ) {
+      return datumFunctions.isCollapsed(datum)
+    }
+
+    return temporaryExpansionOverrides[id] === "collapsed" ? true : false
+  }
+
   const { nodes, missingOrdersById, nextIndex } = buildSiblingNodes({
-    isFilteredOut,
-    parentIsFilteredIn: false,
+    hasChildrenFilteredIn,
     siblings: rootData,
     ...datumFunctions,
+    isCollapsed,
     data,
     nextIndex: 0,
     nodesByIndex,
@@ -55,18 +73,11 @@ export function buildTree<Datum>({
     parents: [],
   })
 
-  const roots = isFilteredOut
-    ? nodes.filter((node) => {
-        // If the node has children, it means one of the children matches the filter, so we keep the parent
-        if (node.children.length > 0) return true
-        return !isFilteredOut(node.data)
-      })
-    : nodes
-
   const build: OrderedTreeBuild<Datum> = {
-    roots,
+    roots: nodes,
     rootData,
     missingOrdersById,
+    expansionOverrides: temporaryExpansionOverrides,
     treeSize: nextIndex,
     nodesByIndex,
     nodesById,
@@ -76,18 +87,83 @@ export function buildTree<Datum>({
   return build
 }
 
-function findRoots<Datum>(
-  data: Datum[],
-  getId: (datum: Datum) => string,
+export function prebuildTree<Datum>({
+  data,
+  isFilteredOut,
+  getParentId,
+  getId,
+}: {
+  data: Datum[]
+  isFilteredOut?: (datum: Datum) => boolean
   getParentId: (datum: Datum) => string | null
-) {
-  const ids = data.map(getId)
+  getId: (datum: Datum) => string
+}) {
+  const dataById = keyBy(data, getId)
+  const hasChildrenFilteredIn: Record<string, boolean> = {}
 
-  return data.filter((datum) => {
+  for (const datum of data) {
+    if (!isFilteredOut) {
+      hasChildrenFilteredIn[getId(datum)] = true
+      continue
+    }
+
+    if (isFilteredOut(datum)) continue
+
+    hasChildrenFilteredIn[getId(datum)] = true
+
+    let parentId = getParentId(datum)
+
+    let depth = 0
+    while (parentId && depth <= 10) {
+      hasChildrenFilteredIn[parentId] = true
+
+      if (depth === 10) {
+        throw new Error("Tree can only be 10 nodes deep")
+      }
+
+      depth++
+
+      const nextParent = dataById[parentId]
+
+      if (!nextParent) {
+        break
+      }
+
+      parentId = getParentId(nextParent)
+    }
+  }
+
+  const temporaryExpansionOverrides = isFilteredOut
+    ? findExpansionOverrides(data, hasChildrenFilteredIn, getId)
+    : {}
+
+  const rootData = data.filter((datum) => {
     const parentId = getParentId(datum)
 
-    return parentId === null || !ids.includes(parentId)
+    const isRoot = parentId === null || !dataById[parentId]
+
+    return isRoot && hasChildrenFilteredIn[getId(datum)]
   })
+
+  return { hasChildrenFilteredIn, rootData, temporaryExpansionOverrides }
+}
+
+function findExpansionOverrides<Datum>(
+  data: Datum[],
+  hasChildrenFilteredIn: Record<string, boolean>,
+  getId: (datum: Datum) => string
+) {
+  const expansionOverrides: Record<string, "expanded" | "collapsed"> = {}
+
+  for (const datum of data) {
+    if (hasChildrenFilteredIn[getId(datum)]) {
+      expansionOverrides[getId(datum)] = "expanded"
+    } else {
+      expansionOverrides[getId(datum)] = "collapsed"
+    }
+  }
+
+  return expansionOverrides
 }
 
 export type OrderedTreeNode<Datum> = {
@@ -105,7 +181,7 @@ type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
   nodesById: Record<string, OrderedTreeNode<Datum>>
   indexesById: Record<string, number>
   parents: OrderedTreeNode<Datum>[]
-  parentIsFilteredIn: boolean
+  hasChildrenFilteredIn: Record<string, boolean>
 }
 
 function buildSiblingNodes<Datum>({
@@ -117,8 +193,8 @@ function buildSiblingNodes<Datum>({
   getParentId,
   isCollapsed,
   isFilteredOut,
-  parentIsFilteredIn,
   nextIndex,
+  hasChildrenFilteredIn,
   nodesByIndex,
   indexesById,
   nodesById,
@@ -137,13 +213,10 @@ function buildSiblingNodes<Datum>({
   const nodes = orderedSiblings.map(function buildNode(
     datum
   ): OrderedTreeNode<Datum> | undefined {
-    const thisNodeIsFilteredIn =
-      parentIsFilteredIn || !isFilteredOut || !isFilteredOut(datum)
-
     const childData = data.filter((possibleChild) => {
       if (getParentId(possibleChild) !== getId(datum)) return false
       if (!isFilteredOut) return true
-      if (isFilteredOut(possibleChild) && !thisNodeIsFilteredIn) return false
+      if (!hasChildrenFilteredIn[getId(possibleChild)]) return false
       return true
     })
 
@@ -167,8 +240,8 @@ function buildSiblingNodes<Datum>({
         nextIndex: newNextIndex,
       } = buildSiblingNodes({
         siblings: childData,
-        parentIsFilteredIn: thisNodeIsFilteredIn,
         data,
+        hasChildrenFilteredIn,
         getParentId,
         getId,
         compare,

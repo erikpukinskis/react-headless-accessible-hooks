@@ -32,6 +32,7 @@ type OrderedTreeModelArgs<Datum> = {
   onDroppingChange: (isDropping: boolean) => void
   collapseNode(nodeId: string): void
   expandNode(nodeId: string): void
+  expansionOverrides: Record<string, "expanded" | "collapsed">
 }
 
 export class OrderedTreeModel<Datum> {
@@ -45,6 +46,7 @@ export class OrderedTreeModel<Datum> {
     "getParentId" | "getOrder" | "getId" | "isCollapsed"
   >
   tree: OrderedTreeBuild<Datum>
+  expansionOverrides: Record<string, "expanded" | "collapsed">
   treeBox?: TreeBox
   dump: DebugDataDumper
   nodeListenersById: Partial<Record<string | typeof NoParent, NodeListener>> =
@@ -59,6 +61,7 @@ export class OrderedTreeModel<Datum> {
     getOrder,
     getId,
     isCollapsed,
+    expansionOverrides,
     dump,
     onNodeMove,
     onClick,
@@ -70,6 +73,7 @@ export class OrderedTreeModel<Datum> {
     this.onNodeMove = onNodeMove
     this.onClick = onClick
     this.onDroppingChange = onDroppingChange
+    this.expansionOverrides = expansionOverrides
   }
 
   cleanup() {
@@ -234,8 +238,9 @@ export class OrderedTreeModel<Datum> {
     const draggedOutTheOnlyChild =
       node.children.length === 1 &&
       node.children[0].id === this.dragStart?.node.id
+    const override = this.expansionOverrides[id]
 
-    if (wasCollapsedByUser) return "collapsed"
+    if (wasCollapsedByUser && override !== "expanded") return "collapsed"
 
     if (isPlaceholder && hasChildren) return "collapsed"
 
@@ -244,6 +249,8 @@ export class OrderedTreeModel<Datum> {
     if (draggedOutTheOnlyChild) return "no children"
 
     if (!hasChildren) return "no children"
+
+    if (override === "collapsed") return "collapsed"
 
     return "expanded"
   }

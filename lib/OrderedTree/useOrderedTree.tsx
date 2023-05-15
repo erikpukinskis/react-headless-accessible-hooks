@@ -1,4 +1,4 @@
-import { isEmpty } from "lodash"
+import { isEmpty, pickBy } from "lodash"
 import React, {
   createContext,
   useCallback,
@@ -95,6 +95,15 @@ export function useOrderedTree<Datum>({
   const bulkOrderRef = useRef(onBulkNodeOrder)
   bulkOrderRef.current = onBulkNodeOrder
   const [isDropping, setIsDropping] = useState(false)
+  const [userControlledExpansionIds, setUserControlledIds] = useState<string[]>(
+    []
+  )
+
+  useEffect(() => {
+    // Whenever the filter changes, we revert back to the default expansion
+    // overrides provided by prebuildTree:
+    setUserControlledIds([])
+  }, [isFilteredOut])
 
   const datumFunctions = useMemo(
     () => ({
@@ -113,6 +122,7 @@ export function useOrderedTree<Datum>({
     buildTree({
       data,
       ...datumFunctions,
+      userControlledExpansionIds,
     })
   )
 
@@ -122,6 +132,15 @@ export function useOrderedTree<Datum>({
     bulkOrderRef.current(tree.missingOrdersById)
   }, [tree])
 
+  const expansionOverrides = useMemo(() => {
+    const rawExpansionOverrides = tree.expansionOverrides
+
+    return pickBy(
+      rawExpansionOverrides,
+      (_, id) => !userControlledExpansionIds.includes(id)
+    )
+  }, [tree, userControlledExpansionIds])
+
   const [model] = useState(
     () =>
       new OrderedTreeModel({
@@ -130,6 +149,7 @@ export function useOrderedTree<Datum>({
         getOrder,
         getId,
         isCollapsed,
+        expansionOverrides,
         dump,
         onNodeMove,
         onDroppingChange: setIsDropping,
@@ -153,12 +173,13 @@ export function useOrderedTree<Datum>({
       const newTree = buildTree({
         data,
         ...datumFunctions,
+        userControlledExpansionIds,
       })
 
       setTree(newTree)
       model.setTree(newTree)
     },
-    [data, model, datumFunctions]
+    [data, model, datumFunctions, userControlledExpansionIds]
   )
 
   const [TreeProvider] = useState(
