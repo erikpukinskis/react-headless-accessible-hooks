@@ -77,6 +77,11 @@ type UseOrderedTreeReturnType<Datum> = {
   setCollapsed(this: void, datum: Datum, isCollapsed: boolean): void
 }
 
+let renderCount = 0
+let isFilteredOutChangeCount = 0
+let treeCount = 0
+let dataChangeCount = 0
+
 export function useOrderedTree<Datum>({
   data,
 
@@ -101,11 +106,32 @@ export function useOrderedTree<Datum>({
     Record<string, "masked" | undefined>
   >({})
 
+  if (renderCount > 10 && renderCount === isFilteredOutChangeCount) {
+    throw new Error(
+      "isFilteredOut is changing with every render. That's not good."
+    )
+  }
+
+  if (renderCount > 10 && renderCount === dataChangeCount) {
+    throw new Error("data is changing with every render. That's not good.")
+  }
+
+  if (renderCount > 10 && renderCount === treeCount) {
+    throw new Error("tree is changing with every render. That's not good.")
+  }
+
+  renderCount++
+
   useEffect(() => {
+    isFilteredOutChangeCount++
     // Whenever the filter changes, we revert back to the default expansion
     // overrides provided by prebuildTree:
     setExpansionOverrideMask({})
   }, [isFilteredOut])
+
+  useEffect(() => {
+    dataChangeCount++
+  }, [data])
 
   const datumFunctions = useMemo(
     () => ({
@@ -129,6 +155,7 @@ export function useOrderedTree<Datum>({
   )
 
   useEffect(() => {
+    treeCount++
     if (isEmpty(tree.missingOrdersById)) return
 
     bulkOrderRef.current(tree.missingOrdersById)
@@ -158,15 +185,8 @@ export function useOrderedTree<Datum>({
   const isFirstRenderRef = useRef(true)
 
   useEffect(() => {
-    model.setFunctions({
-      getParentId,
-      getOrder,
-      getId,
-      isCollapsed,
-      isFilteredOut,
-      compare,
-    })
-  }, [model, getParentId, getOrder, getId, isCollapsed, isFilteredOut, compare])
+    model.setFunctions(datumFunctions)
+  }, [model, datumFunctions])
 
   useEffect(
     function rebuildTree() {
