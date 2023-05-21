@@ -1,7 +1,7 @@
 import { keyframes, styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
 import { kebabCase } from "lodash"
-import React, { useCallback, useState } from "react"
+import React, { useMemo, useState } from "react"
 import type { UseOrderedTreeArgs } from "./useOrderedTree"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import { useDumpDebugData } from "~/Debug"
@@ -84,47 +84,46 @@ const ORPHANS = [AUNTIE, MOMMA, TIO].map((sibling) => ({
   isCollapsed: false,
 }))
 
-// export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
+export const FlatTree = <Demo render={Template} props={{ data: ORPHANS }} />
 
 const toRootNode = (kin: Kin) => ({ ...kin, parentId: null })
 
-// export const WithChild = (
-//   <Demo
-//     render={Template}
-//     props={{
-//       data: [
-//         { ...toRootNode(MOMMA), order: 0.2 },
-//         KIDDO,
-//         { ...toRootNode(AUNTIE), order: 0.4 },
-//       ],
-//     }}
-//   />
-// )
+export const WithChild = (
+  <Demo
+    render={Template}
+    props={{
+      data: [
+        { ...toRootNode(MOMMA), order: 0.2 },
+        KIDDO,
+        { ...toRootNode(AUNTIE), order: 0.4 },
+      ],
+    }}
+  />
+)
 
-// export const WithCollapsedNode = (
-//   <Demo
-//     render={Template}
-//     props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
-//   />
-// )
+export const WithCollapsedNode = (
+  <Demo
+    render={Template}
+    props={{ data: [GRAMPS, AUNTIE, MOMMA, KIDDO, TIO, COUSIN] }}
+  />
+)
 
 export const Searchable = (
   <Demo
     render={() => {
       const [query, setQuery] = useState("")
 
-      const isFilteredOut = useCallback(
-        (kin: Kin) => {
-          if (!query.trim()) return undefined
+      const isFilteredOut = useMemo(() => {
+        if (!query.trim()) return undefined
 
+        return (kin: Kin) => {
           const doesMatch = kebabCase(kin.name).includes(
             kebabCase(query.trim())
           )
 
           return !doesMatch
-        },
-        [query]
-      )
+        }
+      }, [query])
 
       return (
         <div>
@@ -165,65 +164,74 @@ function Template({
 
   const dump = useDumpDebugData()
 
-  const { roots, getTreeProps, TreeProvider, getKey, isDropping } =
-    useOrderedTree({
-      data,
-      onNodeMove(id, newOrder, newParentId) {
-        const index = data.findIndex((datum) => datum.id === id)
-        const oldDatum = data[index]
+  const {
+    roots,
+    getTreeProps,
+    TreeProvider,
+    getKey,
+    isDropping,
+    isCollapsed,
+    setCollapsed,
+  } = useOrderedTree({
+    data,
+    onNodeMove(id, newOrder, newParentId) {
+      const index = data.findIndex((datum) => datum.id === id)
+      const oldDatum = data[index]
 
-        if (!oldDatum) {
-          throw new Error(`Received order change for missing id ${id}`)
-        }
+      if (!oldDatum) {
+        throw new Error(`Received order change for missing id ${id}`)
+      }
 
-        const newDatum = {
-          ...oldDatum,
-          order: newOrder,
-          parentId: newParentId,
-        }
+      const newDatum = {
+        ...oldDatum,
+        order: newOrder,
+        parentId: newParentId,
+      }
 
-        const newArray = [...data]
-        newArray[index] = newDatum
+      const newArray = [...data]
+      newArray[index] = newDatum
 
-        setTimeout(() => {
-          setData(newArray)
-        }, 500)
-      },
-      onBulkNodeOrder(ordersById) {
-        setData(
-          data.map((kin) => {
-            const newOrder = ordersById[kin.id]
+      setTimeout(() => {
+        setData(newArray)
+      }, 500)
+    },
+    onBulkNodeOrder(ordersById) {
+      setData(
+        data.map((kin) => {
+          const newOrder = ordersById[kin.id]
 
-            if (newOrder === undefined) return kin
+          if (newOrder === undefined) return kin
 
-            return { ...kin, order: newOrder }
-          })
-        )
-      },
-      onClick(clickedKin) {
-        setData((data) =>
-          data.map((kin) => {
-            if (kin.id !== clickedKin.id) {
-              return kin
-            }
+          return { ...kin, order: newOrder }
+        })
+      )
+    },
+    onClick(clickedKin) {
+      const isCollapsedNow = !isCollapsed(clickedKin)
+      setCollapsed(clickedKin, isCollapsedNow)
+      setData((data) =>
+        data.map((kin) => {
+          if (kin.id !== clickedKin.id) {
+            return kin
+          }
 
-            return {
-              ...kin,
-              isCollapsed: !kin.isCollapsed,
-            }
-          })
-        )
-      },
-      getId: (kin) => kin.id,
-      getParentId: (kin) => kin.parentId,
-      getOrder: (kin) => kin.order,
-      compare: (a: Kin, b: Kin) => {
-        return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
-      },
-      isCollapsed: (kin) => kin.isCollapsed,
-      dump,
-      ...overrides,
-    })
+          return {
+            ...kin,
+            isCollapsed: isCollapsedNow,
+          }
+        })
+      )
+    },
+    getId: (kin) => kin.id,
+    getParentId: (kin) => kin.parentId,
+    getOrder: (kin) => kin.order,
+    compare: (a: Kin, b: Kin) => {
+      return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
+    },
+    isCollapsed: (kin) => kin.isCollapsed,
+    dump,
+    ...overrides,
+  })
 
   return (
     <Tree {...getTreeProps()} disabled={isDropping}>
@@ -390,13 +398,13 @@ const DepthIndicator = ({ id, depth, expansion }: DepthIndicatorProps) => {
   return expansion === "collapsed" ? (
     <>
       {stars}
-      {BLACK_RIGHT_POINTING_TRIANGLE}
+      <PointerSpan>{BLACK_RIGHT_POINTING_TRIANGLE}</PointerSpan>
       {SPACE}
     </>
   ) : expansion === "expanded" ? (
     <>
       {stars}
-      {BLACK_DOWN_POINTING_TRIANGLE}
+      <PointerSpan>{BLACK_DOWN_POINTING_TRIANGLE}</PointerSpan>
       {SPACE}
     </>
   ) : (
@@ -407,3 +415,7 @@ const DepthIndicator = ({ id, depth, expansion }: DepthIndicatorProps) => {
     </>
   )
 }
+
+const PointerSpan = styled("span", {
+  cursor: "pointer",
+})

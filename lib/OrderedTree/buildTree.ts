@@ -10,53 +10,49 @@ export type DatumFunctions<Datum> = {
   isFilteredOut?(this: void, datum: Datum): boolean | undefined
 }
 
-export type OrderedTreeBuild<Datum> = {
+export type OrderedTreeBuild<Datum> = Readonly<{
   roots: OrderedTreeNode<Datum>[]
   rootData: Datum[]
   treeSize: number
   missingOrdersById: Record<string, number>
-  expansionOverrides: Record<string, "expanded" | "collapsed">
+  expansionOverrides: Record<string, "expanded" | "collapsed" | undefined>
   nodesByIndex: Record<number, OrderedTreeNode<Datum>>
   nodesById: Record<string, OrderedTreeNode<Datum>>
   indexesById: Record<string, number>
-}
+}>
 
 type BuildTreeArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
-  userControlledExpansionIds: string[]
+  expansionOverrideMask: Record<string, "masked" | undefined>
 }
 
 export function buildTree<Datum>({
   data,
+  expansionOverrideMask,
   isFilteredOut,
-  userControlledExpansionIds,
   ...datumFunctions
 }: BuildTreeArgs<Datum>): OrderedTreeBuild<Datum> {
   console.log("Building tree")
-
   const nodesByIndex: Record<number, OrderedTreeNode<Datum>> = {}
   const nodesById: Record<string, OrderedTreeNode<Datum>> = {}
   const indexesById: Record<string, number> = {}
 
-  const { hasChildrenFilteredIn, rootData, temporaryExpansionOverrides } =
-    prebuildTree({
-      data,
-      isFilteredOut,
-      getParentId: datumFunctions.getParentId,
-      getId: datumFunctions.getId,
-    })
+  const { hasChildrenFilteredIn, rootData, expansionOverrides } = prebuildTree({
+    data,
+    isFilteredOut,
+    getParentId: datumFunctions.getParentId,
+    getId: datumFunctions.getId,
+    isCollapsed: datumFunctions.isCollapsed,
+  })
 
   const isCollapsed = (datum: Datum) => {
     const id = datumFunctions.getId(datum)
 
-    if (
-      userControlledExpansionIds.includes(id) ||
-      !temporaryExpansionOverrides[id]
-    ) {
+    if (!expansionOverrides[id] || expansionOverrideMask[id] === "masked") {
       return datumFunctions.isCollapsed(datum)
     }
 
-    return temporaryExpansionOverrides[id] === "collapsed" ? true : false
+    return expansionOverrides[id] === "collapsed" ? true : false
   }
 
   const { nodes, missingOrdersById, nextIndex } = buildSiblingNodes({
@@ -76,7 +72,7 @@ export function buildTree<Datum>({
     roots: nodes,
     rootData,
     missingOrdersById,
-    expansionOverrides: temporaryExpansionOverrides,
+    expansionOverrides,
     treeSize: nextIndex,
     nodesByIndex,
     nodesById,
@@ -88,7 +84,7 @@ export function buildTree<Datum>({
 
 type PrebuildTreeArgs<Datum> = Pick<
   DatumFunctions<Datum>,
-  "isFilteredOut" | "getParentId" | "getId"
+  "isFilteredOut" | "getParentId" | "getId" | "isCollapsed"
 > & {
   data: Datum[]
 }
@@ -98,6 +94,7 @@ export function prebuildTree<Datum>({
   isFilteredOut,
   getParentId,
   getId,
+  isCollapsed,
 }: PrebuildTreeArgs<Datum>) {
   const dataById = keyBy(data, getId)
   const hasChildrenFilteredIn: Record<string, boolean> = {}
@@ -134,8 +131,13 @@ export function prebuildTree<Datum>({
     }
   }
 
-  const temporaryExpansionOverrides = isFilteredOut
-    ? findExpansionOverrides(data, hasChildrenFilteredIn, getId)
+  const expansionOverrides = isFilteredOut
+    ? findExpansionOverrides({
+        data,
+        hasChildrenFilteredIn,
+        getId,
+        isCollapsed,
+      })
     : {}
 
   const rootData = data.filter((datum) => {
@@ -146,20 +148,36 @@ export function prebuildTree<Datum>({
     return isRoot && hasChildrenFilteredIn[getId(datum)]
   })
 
-  return { hasChildrenFilteredIn, rootData, temporaryExpansionOverrides }
+  return { hasChildrenFilteredIn, rootData, expansionOverrides }
 }
 
-function findExpansionOverrides<Datum>(
-  data: Datum[],
-  hasChildrenFilteredIn: Record<string, boolean>,
-  getId: (datum: Datum) => string
-) {
-  const expansionOverrides: Record<string, "expanded" | "collapsed"> = {}
+type FindExpansionOverridesArgs<Datum> = {
+  data: Datum[]
+  hasChildrenFilteredIn: Record<string, boolean>
+  getId(datum: Datum): string
+  isCollapsed(datum: Datum): boolean
+}
+
+function findExpansionOverrides<Datum>({
+  data,
+  hasChildrenFilteredIn,
+  getId,
+  isCollapsed,
+}: FindExpansionOverridesArgs<Datum>) {
+  const expansionOverrides: Record<
+    string,
+    "expanded" | "collapsed" | undefined
+  > = {}
 
   for (const datum of data) {
-    if (hasChildrenFilteredIn[getId(datum)]) {
+    const filteredIn = hasChildrenFilteredIn[getId(datum)]
+    const collapsed = isCollapsed?.(datum)
+
+    if (collapsed && filteredIn) {
       expansionOverrides[getId(datum)] = "expanded"
-    } else {
+    }
+
+    if (!collapsed && !filteredIn) {
       expansionOverrides[getId(datum)] = "collapsed"
     }
   }
@@ -167,12 +185,15 @@ function findExpansionOverrides<Datum>(
   return expansionOverrides
 }
 
-export type OrderedTreeNode<Datum> = {
+export type OpenOrderedTreeNode<Datum> = {
   id: string
   data: Datum
   children: OrderedTreeNode<Datum>[]
   parents: OrderedTreeNode<Datum>[]
+  hasCollapsedChildren: boolean
 }
+
+export type OrderedTreeNode<Datum> = Readonly<OpenOrderedTreeNode<Datum>>
 
 type BuildNodesArgs<Datum> = DatumFunctions<Datum> & {
   data: Datum[]
@@ -193,7 +214,6 @@ function buildSiblingNodes<Datum>({
   compare,
   getParentId,
   isCollapsed,
-  isFilteredOut,
   nextIndex,
   hasChildrenFilteredIn,
   nodesByIndex,
@@ -215,10 +235,10 @@ function buildSiblingNodes<Datum>({
     datum
   ): OrderedTreeNode<Datum> | undefined {
     const childData = data.filter((possibleChild) => {
-      if (getParentId(possibleChild) !== getId(datum)) return false
-      if (!isFilteredOut) return true
-      if (!hasChildrenFilteredIn[getId(possibleChild)]) return false
-      return true
+      return getParentId(possibleChild) === getId(datum)
+      // if (!isFilteredOut) return true
+      // if (!hasChildrenFilteredIn[getId(possibleChild)]) return false
+      // return true
     })
 
     const nodeIndex = nextIndex
@@ -227,11 +247,12 @@ function buildSiblingNodes<Datum>({
 
     const id = getId(datum)
 
-    const node: OrderedTreeNode<Datum> = {
+    const node: OpenOrderedTreeNode<Datum> = {
       id,
       data: datum,
       children: [] as OrderedTreeNode<Datum>[],
       parents: parents,
+      hasCollapsedChildren: childData.length > 0 && isCollapsed(datum),
     }
 
     if (childData.length > 0 && !isCollapsed(datum)) {
@@ -255,11 +276,10 @@ function buildSiblingNodes<Datum>({
         parents: [node, ...parents],
       })
 
-      if (!isCollapsed(datum)) {
-        node.children = childNodes
-      }
+      node.children = childNodes
 
       Object.assign(missingOrdersById, moreMissingOrders)
+
       nextIndex = newNextIndex
     }
 
@@ -267,7 +287,7 @@ function buildSiblingNodes<Datum>({
     nodesById[id] = node
     indexesById[id] = nodeIndex
 
-    return node
+    return node as OrderedTreeNode<Datum>
   })
 
   return {

@@ -81,7 +81,7 @@ describe("buildTree", () => {
     const { roots } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(roots[0].data.name).toBe("gramps")
@@ -109,7 +109,7 @@ describe("buildTree", () => {
     const { roots, indexesById } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(roots[0].data.name).toBe("gramps")
@@ -129,7 +129,7 @@ describe("buildTree", () => {
     const { roots, indexesById } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(roots[0].data.name).toBe("gramps")
@@ -151,7 +151,7 @@ describe("buildTree", () => {
     const { roots, indexesById } = buildTree({
       data,
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(roots[0].data.name).toBe("gramps")
@@ -170,7 +170,7 @@ describe("buildTree", () => {
     const { missingOrdersById } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     const updates = Object.entries(missingOrdersById).reduce(
@@ -191,7 +191,7 @@ describe("buildTree", () => {
     const { roots, missingOrdersById } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(
@@ -219,7 +219,7 @@ describe("buildTree", () => {
     const { roots, missingOrdersById } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(
@@ -246,7 +246,7 @@ describe("buildTree", () => {
     const { roots, missingOrdersById } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(
@@ -273,7 +273,7 @@ describe("buildTree", () => {
     const { roots, missingOrdersById } = buildTree({
       data: cloneDeep(DATA),
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     const gramps = roots[0]
@@ -292,7 +292,7 @@ describe("buildTree", () => {
     const tree = buildTree({
       data: [AUNTIE, MOMMA, GRANDKID],
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(tree.roots).toHaveLength(2)
@@ -308,7 +308,7 @@ describe("buildTree", () => {
       data: [AUNTIE, MOMMA, GRANDKID],
       ...FUNCTIONS,
       isFilteredOut: (kin) => kin.id === "momma" || kin.id === "grandkid",
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(tree.roots).toHaveLength(1)
@@ -320,7 +320,7 @@ describe("buildTree", () => {
       data: [AUNTIE, MOMMA, GRANDKID],
       ...FUNCTIONS,
       isFilteredOut: (kin) => kin.id === "auntie",
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(tree.roots).toHaveLength(1)
@@ -339,6 +339,7 @@ describe("buildTree", () => {
       getParentId: FUNCTIONS["getParentId"],
       getId: FUNCTIONS["getId"],
       isFilteredOut: (kin) => kin.id !== "banana-pops",
+      isCollapsed: (kin) => kin.isCollapsed,
     })
 
     expect(hasChildrenFilteredIn["banana-pops"]).toBeTruthy()
@@ -351,7 +352,7 @@ describe("buildTree", () => {
       data: [AUNTIE, MOMMA, GRANDKID],
       ...FUNCTIONS,
       isFilteredOut: (kin) => kin.id === "auntie",
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(tree.roots).toHaveLength(1)
@@ -365,7 +366,7 @@ describe("buildTree", () => {
       data: [AUNTIE, { ...MOMMA, isCollapsed: true }, GRANDKID],
       ...FUNCTIONS,
       isFilteredOut: (kin) => kin.id !== "grandkid",
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     expect(tree.roots).toHaveLength(1)
@@ -405,7 +406,7 @@ describe("buildTree", () => {
     const tree = buildTree({
       data: [parent, child, peer],
       ...FUNCTIONS,
-      userControlledExpansionIds: [],
+      expansionOverrideMask: {},
     })
 
     const nodeToCollapse = tree.nodesById["parent"]

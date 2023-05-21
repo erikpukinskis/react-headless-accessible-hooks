@@ -4,6 +4,7 @@ import React, { Profiler, useEffect, useState } from "react"
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import type { DatumFunctions, UseOrderedTreeArgs } from "./useOrderedTree"
+import type { Kin } from "~/kin"
 import { buildKin } from "~/kin"
 import { MockDOMLayout } from "~/testHelpers"
 

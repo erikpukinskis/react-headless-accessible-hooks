@@ -6,7 +6,7 @@ import { startCase } from "lodash"
  * the data type. The useOrderedTree hook gets all of the information it needs
  * about your data via the "Datum Functions" defined below...
  */
-type Kin = {
+export type Kin = {
   id: string
   createdAt: string
   name: string

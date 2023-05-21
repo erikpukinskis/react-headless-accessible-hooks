@@ -1,4 +1,4 @@
-import { get, isEqual, noop } from "lodash"
+import { get, isEqual, noop, union } from "lodash"
 import type {
   DatumFunctions,
   OrderedTreeBuild,
@@ -25,7 +25,6 @@ type OrderedTreeModelArgs<Datum> = {
   onDroppingChange: (isDropping: boolean) => void
   collapseNode(nodeId: string): void
   expandNode(nodeId: string): void
-  expansionOverrides: Record<string, "expanded" | "collapsed">
 }
 
 export class OrderedTreeModel<Datum> {
@@ -36,7 +35,7 @@ export class OrderedTreeModel<Datum> {
   isDropping = false
   functions: DatumFunctions<Datum>
   tree: OrderedTreeBuild<Datum>
-  expansionOverrides: Record<string, "expanded" | "collapsed">
+  expansionOverrideMask: Record<string, "masked"> = {}
   treeBox?: TreeBox
   dump: DebugDataDumper
   nodeListenersById: Partial<Record<string | typeof NoParent, NodeListener>> =
@@ -48,7 +47,6 @@ export class OrderedTreeModel<Datum> {
   constructor({
     tree,
     functions,
-    expansionOverrides,
     dump,
     onNodeMove,
     onClick,
@@ -60,7 +58,6 @@ export class OrderedTreeModel<Datum> {
     this.onNodeMove = onNodeMove
     this.onClick = onClick
     this.onDroppingChange = onDroppingChange
-    this.expansionOverrides = expansionOverrides
   }
 
   cleanup() {
@@ -75,10 +72,28 @@ export class OrderedTreeModel<Datum> {
   }
 
   setTree(tree: OrderedTreeBuild<Datum>) {
+    const oldOverrides = this.tree.expansionOverrides
     this.tree = tree
 
     if (this.isDropping) {
       this.finishDrop()
+    }
+
+    const nodeIds = union(
+      Object.keys(oldOverrides),
+      Object.keys(tree.expansionOverrides)
+    )
+
+    for (const nodeId of nodeIds) {
+      if (tree.expansionOverrides[nodeId] === oldOverrides[nodeId]) continue
+
+      const node = tree.nodesById[nodeId]
+
+      if (!node) continue // Node got filtered out
+
+      this.notifyNodeOfChange(nodeId, {
+        expansion: this.getExpansion(node.data),
+      })
     }
   }
 
@@ -88,6 +103,20 @@ export class OrderedTreeModel<Datum> {
 
   setFunctions(functions: DatumFunctions<Datum>) {
     this.functions = functions
+  }
+
+  setCollapsed(datum: Datum, isCollapsed: boolean) {
+    isCollapsed // Don't need this yet, but we may in the future and this keeps Typescript happy
+
+    const nodeId = this.functions.getId(datum)
+
+    this.expansionOverrideMask[nodeId] = "masked"
+
+    this.notifyNodeOfChange(nodeId, { expansion: this.getExpansion(datum) })
+  }
+
+  maskExpansionOverride(id: string) {
+    this.expansionOverrideMask[id] = "masked"
   }
 
   getNode(datum: Datum) {
@@ -235,13 +264,17 @@ export class OrderedTreeModel<Datum> {
     const isPlaceholder = this.isPlaceholder(datum)
     const node = this.getNode(datum)
     const wasCollapsedByUser = this.functions.isCollapsed(datum)
-    const hasChildren = node.children.length > 0
+    const hasChildren = node.children.length > 0 || node.hasCollapsedChildren
     const id = this.functions.getId(datum)
     const draggingIntoThisNode = id === this.dragEnd?.parentId
     const draggedOutTheOnlyChild =
       node.children.length === 1 &&
       node.children[0].id === this.dragStart?.node.id
-    const override = this.expansionOverrides[id]
+
+    const override =
+      this.expansionOverrideMask[id] === "masked"
+        ? undefined
+        : this.tree.expansionOverrides[id]
 
     if (wasCollapsedByUser && override !== "expanded") return "collapsed"
 

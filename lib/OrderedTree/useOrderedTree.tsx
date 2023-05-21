@@ -1,4 +1,4 @@
-import { isEmpty, pickBy } from "lodash"
+import { isEmpty } from "lodash"
 import React, {
   createContext,
   useCallback,
@@ -73,6 +73,8 @@ type UseOrderedTreeReturnType<Datum> = {
   TreeProvider(this: void, props: { children: React.ReactNode }): JSX.Element
   getKey(this: void, datum: Datum): string
   isDropping: boolean
+  isCollapsed(this: void, datum: Datum): boolean
+  setCollapsed(this: void, datum: Datum, isCollapsed: boolean): void
 }
 
 export function useOrderedTree<Datum>({
@@ -95,14 +97,14 @@ export function useOrderedTree<Datum>({
   const bulkOrderRef = useRef(onBulkNodeOrder)
   bulkOrderRef.current = onBulkNodeOrder
   const [isDropping, setIsDropping] = useState(false)
-  const [userControlledExpansionIds, setUserControlledIds] = useState<string[]>(
-    []
-  )
+  const [expansionOverrideMask, setExpansionOverrideMask] = useState<
+    Record<string, "masked" | undefined>
+  >({})
 
   useEffect(() => {
     // Whenever the filter changes, we revert back to the default expansion
     // overrides provided by prebuildTree:
-    setUserControlledIds([])
+    setExpansionOverrideMask({})
   }, [isFilteredOut])
 
   const datumFunctions = useMemo(
@@ -121,8 +123,8 @@ export function useOrderedTree<Datum>({
   const [tree, setTree] = useState(() =>
     buildTree({
       data,
+      expansionOverrideMask,
       ...datumFunctions,
-      userControlledExpansionIds,
     })
   )
 
@@ -131,15 +133,6 @@ export function useOrderedTree<Datum>({
 
     bulkOrderRef.current(tree.missingOrdersById)
   }, [tree])
-
-  const expansionOverrides = useMemo(() => {
-    const rawExpansionOverrides = tree.expansionOverrides
-
-    return pickBy(
-      rawExpansionOverrides,
-      (_, id) => !userControlledExpansionIds.includes(id)
-    )
-  }, [tree, userControlledExpansionIds])
 
   const [model] = useState(
     () =>
@@ -153,7 +146,6 @@ export function useOrderedTree<Datum>({
           isFilteredOut,
           compare,
         },
-        expansionOverrides,
         dump,
         onNodeMove,
         onDroppingChange: setIsDropping,
@@ -186,14 +178,14 @@ export function useOrderedTree<Datum>({
 
       const newTree = buildTree({
         data,
+        expansionOverrideMask,
         ...datumFunctions,
-        userControlledExpansionIds,
       })
 
       setTree(newTree)
       model.setTree(newTree)
     },
-    [data, model, datumFunctions, userControlledExpansionIds]
+    [data, model, datumFunctions, expansionOverrideMask]
   )
 
   const [TreeProvider] = useState(
@@ -282,12 +274,25 @@ export function useOrderedTree<Datum>({
     return model.getKey(datum)
   }
 
+  function setCollapsed(datum: Datum, isCollapsedNow: boolean) {
+    model.setCollapsed(datum, isCollapsedNow)
+
+    const nodeId = getId(datum)
+
+    setExpansionOverrideMask({
+      ...expansionOverrideMask,
+      [nodeId]: "masked",
+    })
+  }
+
   return {
     roots: rootsWithPlaceholder,
     getTreeProps,
     TreeProvider,
     getKey,
     isDropping,
+    isCollapsed: (datum) => model.getExpansion(datum) === "collapsed",
+    setCollapsed,
   }
 }
 
