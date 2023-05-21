@@ -87,7 +87,6 @@ export class OrderedTreeModel<Datum> {
     for (const nodeId of nodeIds) {
       if (tree.expansionOverrides[nodeId] === oldOverrides[nodeId]) continue
 
-      console.log("expansion override for", nodeId, "changed!")
       const node = tree.nodesById[nodeId]
 
       if (!node) continue // Node got filtered out
