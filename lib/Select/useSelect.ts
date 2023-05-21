@@ -32,7 +32,9 @@ export const useSelect = <Datum>({
       if (highlightedIndex === -1) return undefined
       if (!data) return undefined
       if (data.length < 1) return undefined
-      return getOptionValue(data[highlightedIndex])
+      const item = data[highlightedIndex]
+      if (!item) return undefined
+      return getOptionValue(item)
     },
     [highlightedIndex, data, getOptionValue]
   )
