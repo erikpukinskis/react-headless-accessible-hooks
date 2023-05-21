@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import type { OrderedTreeNode } from "./buildTree"
+import type { OpenOrderedTreeNode, OrderedTreeNode } from "./buildTree"
 import { getAncestorChain } from "./drag"
 
 type NodeOverrides = {
@@ -12,12 +12,13 @@ function buildNode({
   id,
   children,
   parents,
-}: NodeOverrides): OrderedTreeNode<false> {
+}: NodeOverrides): OpenOrderedTreeNode<false> {
   return {
     id,
     children,
     parents,
     data: false,
+    hasCollapsedChildren: false,
   }
 }
 

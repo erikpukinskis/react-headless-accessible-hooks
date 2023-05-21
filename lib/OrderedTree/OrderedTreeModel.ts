@@ -1,4 +1,4 @@
-import { get, isEqual, noop } from "lodash"
+import { get, isEqual, noop, union } from "lodash"
 import type {
   DatumFunctions,
   OrderedTreeBuild,
@@ -14,14 +14,7 @@ import { assert } from "~/helpers"
 
 type OrderedTreeModelArgs<Datum> = {
   tree: OrderedTreeBuild<Datum>
-
-  // Datum functions
-  getParentId: DatumFunctions<Datum>["getParentId"]
-  getOrder: DatumFunctions<Datum>["getOrder"]
-  getId: DatumFunctions<Datum>["getId"]
-  isCollapsed: DatumFunctions<Datum>["isCollapsed"]
-
-  // Other
+  functions: DatumFunctions<Datum>
   dump?: DebugDataDumper
   onNodeMove: (
     nodeId: string,
@@ -40,11 +33,9 @@ export class OrderedTreeModel<Datum> {
   dragStart?: DragStart<Datum>
   dragEnd?: DragEnd
   isDropping = false
-  data: Pick<
-    DatumFunctions<Datum>,
-    "getParentId" | "getOrder" | "getId" | "isCollapsed"
-  >
+  functions: DatumFunctions<Datum>
   tree: OrderedTreeBuild<Datum>
+  expansionOverrideMask: Record<string, "masked"> = {}
   treeBox?: TreeBox
   dump: DebugDataDumper
   nodeListenersById: Partial<Record<string | typeof NoParent, NodeListener>> =
@@ -55,17 +46,14 @@ export class OrderedTreeModel<Datum> {
 
   constructor({
     tree,
-    getParentId,
-    getOrder,
-    getId,
-    isCollapsed,
+    functions,
     dump,
     onNodeMove,
     onClick,
     onDroppingChange,
   }: OrderedTreeModelArgs<Datum>) {
     this.tree = tree
-    this.data = { getParentId, getOrder, getId, isCollapsed }
+    this.functions = functions
     this.dump = dump ?? noop
     this.onNodeMove = onNodeMove
     this.onClick = onClick
@@ -84,10 +72,28 @@ export class OrderedTreeModel<Datum> {
   }
 
   setTree(tree: OrderedTreeBuild<Datum>) {
+    const oldOverrides = this.tree.expansionOverrides
     this.tree = tree
 
     if (this.isDropping) {
       this.finishDrop()
+    }
+
+    const nodeIds = union(
+      Object.keys(oldOverrides),
+      Object.keys(tree.expansionOverrides)
+    )
+
+    for (const nodeId of nodeIds) {
+      if (tree.expansionOverrides[nodeId] === oldOverrides[nodeId]) continue
+
+      const node = tree.nodesById[nodeId]
+
+      if (!node) continue // Node got filtered out
+
+      this.notifyNodeOfChange(nodeId, {
+        expansion: this.getExpansion(node.data),
+      })
     }
   }
 
@@ -95,8 +101,26 @@ export class OrderedTreeModel<Datum> {
     this.treeBox = box
   }
 
+  setFunctions(functions: DatumFunctions<Datum>) {
+    this.functions = functions
+  }
+
+  setCollapsed(datum: Datum, isCollapsed: boolean) {
+    isCollapsed // Don't need this yet, but we may in the future and this keeps Typescript happy
+
+    const nodeId = this.functions.getId(datum)
+
+    this.expansionOverrideMask[nodeId] = "masked"
+
+    this.notifyNodeOfChange(nodeId, { expansion: this.getExpansion(datum) })
+  }
+
+  maskExpansionOverride(id: string) {
+    this.expansionOverrideMask[id] = "masked"
+  }
+
   getNode(datum: Datum) {
-    return this.tree.nodesById[this.data.getId(datum)]
+    return this.tree.nodesById[this.functions.getId(datum)]
   }
 
   getIndexes() {
@@ -144,8 +168,8 @@ export class OrderedTreeModel<Datum> {
   // come from the datum or it could come from tree.missingOrdersById.
   getOrder(datum: Datum) {
     return (
-      this.data.getOrder(datum) ??
-      this.tree.missingOrdersById[this.data.getId(datum)]
+      this.functions.getOrder(datum) ??
+      this.tree.missingOrdersById[this.functions.getId(datum)]
     )
   }
 
@@ -192,6 +216,16 @@ export class OrderedTreeModel<Datum> {
     return !this.dragStart
   }
 
+  doesMatch(datum: Datum) {
+    if (!this.functions.isFilteredOut) return false
+
+    const isFilteredOut = this.functions.isFilteredOut(datum)
+
+    if (isFilteredOut === undefined) return false
+
+    return !isFilteredOut
+  }
+
   isPlaceholderParent(id: string | null) {
     return this.dragEnd?.parentId === id
   }
@@ -206,7 +240,9 @@ export class OrderedTreeModel<Datum> {
 
   getKey(datum: Datum) {
     if (datum === this.dragStart?.placeholderDatum) {
-      const placeholderId = this.data.getId(this.dragStart.placeholderDatum)
+      const placeholderId = this.functions.getId(
+        this.dragStart.placeholderDatum
+      )
       const parentId = this.dragEnd?.parentId
       const parentDescription =
         parentId === null
@@ -217,8 +253,8 @@ export class OrderedTreeModel<Datum> {
 
       return `placeholder-node-${placeholderId}-under-${parentDescription}`
     } else {
-      const id = this.data.getId(datum)
-      const parentId = this.data.getParentId(datum) ?? "root"
+      const id = this.functions.getId(datum)
+      const parentId = this.functions.getParentId(datum) ?? "root"
 
       return `ordered-node-${id}-under-${parentId}`
     }
@@ -227,15 +263,20 @@ export class OrderedTreeModel<Datum> {
   getExpansion(datum: Datum): "expanded" | "collapsed" | "no children" {
     const isPlaceholder = this.isPlaceholder(datum)
     const node = this.getNode(datum)
-    const wasCollapsedByUser = this.data.isCollapsed(datum)
-    const hasChildren = node.children.length > 0
-    const id = this.data.getId(datum)
+    const wasCollapsedByUser = this.functions.isCollapsed(datum)
+    const hasChildren = node.children.length > 0 || node.hasCollapsedChildren
+    const id = this.functions.getId(datum)
     const draggingIntoThisNode = id === this.dragEnd?.parentId
     const draggedOutTheOnlyChild =
       node.children.length === 1 &&
       node.children[0].id === this.dragStart?.node.id
 
-    if (wasCollapsedByUser) return "collapsed"
+    const override =
+      this.expansionOverrideMask[id] === "masked"
+        ? undefined
+        : this.tree.expansionOverrides[id]
+
+    if (wasCollapsedByUser && override !== "expanded") return "collapsed"
 
     if (isPlaceholder && hasChildren) return "collapsed"
 
@@ -244,6 +285,8 @@ export class OrderedTreeModel<Datum> {
     if (draggedOutTheOnlyChild) return "no children"
 
     if (!hasChildren) return "no children"
+
+    if (override === "collapsed") return "collapsed"
 
     return "expanded"
   }
@@ -277,7 +320,9 @@ export class OrderedTreeModel<Datum> {
   childIsBeingDragged(parentId: string) {
     if (!this.dragStart) return false
 
-    const dragNodeParentId = this.data.getParentId(this.dragStart.node.data)
+    const dragNodeParentId = this.functions.getParentId(
+      this.dragStart.node.data
+    )
 
     return parentId === dragNodeParentId
   }
@@ -392,7 +437,7 @@ export class OrderedTreeModel<Datum> {
       hoverIndex,
       dx,
       dy,
-      isCollapsed: this.data.isCollapsed,
+      isCollapsed: this.functions.isCollapsed,
       isLastChild: this.isLastChild.bind(this),
     })
 
@@ -417,7 +462,7 @@ export class OrderedTreeModel<Datum> {
 
     if (dragData.move === "nowhere") {
       newOrder = assert(this.dragStart.originalOrder, "No original order")
-      newParentId = this.data.getParentId(this.dragStart.node.data)
+      newParentId = this.functions.getParentId(this.dragStart.node.data)
       newDepth = this.dragStart.node.parents.length
     } else if (dragData.relativeTo === undefined) {
       throw new Error(
@@ -430,7 +475,7 @@ export class OrderedTreeModel<Datum> {
         siblings: dragData.relativeTo.children,
         missingOrdersById: this.tree.missingOrdersById,
         getOrder: this.getOrder.bind(this),
-        getId: this.data.getId,
+        getId: this.functions.getId,
       })
 
       newParentId = dragData.relativeTo.id
@@ -445,7 +490,7 @@ export class OrderedTreeModel<Datum> {
         siblings,
         missingOrdersById: this.tree.missingOrdersById,
         getOrder: this.getOrder.bind(this),
-        getId: this.data.getId,
+        getId: this.functions.getId,
       })
 
       newParentId = newParent?.id ?? null
@@ -477,7 +522,7 @@ export class OrderedTreeModel<Datum> {
 
     const oldParentId = dragEnd
       ? dragEnd.parentId
-      : this.data.getParentId(dragStart.node.data)
+      : this.functions.getParentId(dragStart.node.data)
 
     const oldOrder = dragEnd?.order
 
@@ -561,7 +606,7 @@ export class OrderedTreeModel<Datum> {
     element.style.height = `${rect.height}px`
     element.style.boxSizing = "border-box"
 
-    const node = this.tree.nodesById[this.data.getId(datum)]
+    const node = this.tree.nodesById[this.functions.getId(datum)]
 
     this.dragStart = {
       node,
@@ -613,7 +658,7 @@ export class OrderedTreeModel<Datum> {
     })
 
     if (dragEnd.parentId !== undefined) {
-      const originalParentId = this.data.getParentId(dragStart.node.data)
+      const originalParentId = this.functions.getParentId(dragStart.node.data)
 
       this.notifyNodeOfChange(originalParentId, { isDropping: true })
 
@@ -625,7 +670,7 @@ export class OrderedTreeModel<Datum> {
 
     if (isLackingPrecision(dragEnd.order)) {
       throw new Error(
-        `Hit the minimum precision on a tree node order (on id ${this.data.getId(
+        `Hit the minimum precision on a tree node order (on id ${this.functions.getId(
           dragStart.node.data
         )}). We should defragment here, but RHAH doesn't support that yet`
       )
@@ -665,7 +710,7 @@ export class OrderedTreeModel<Datum> {
           : this.getExpansion(this.tree.nodesById[dragEnd.parentId].data),
     })
 
-    const originalParentId = this.data.getParentId(dragStart.node.data)
+    const originalParentId = this.functions.getParentId(dragStart.node.data)
 
     this.notifyNodeOfChange(originalParentId, { isDropping: false })
   }

@@ -1,8 +1,11 @@
 import { keyframes, styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
-import React, { useState } from "react"
+import { kebabCase } from "lodash"
+import React, { useMemo, useState } from "react"
+import type { UseOrderedTreeArgs } from "./useOrderedTree"
 import { useOrderedTree, useOrderedTreeNode } from "./useOrderedTree"
 import { useDumpDebugData } from "~/Debug"
+import { buildKin } from "~/kin"
 
 export default (
   <Doc path="/Docs/OrderedTree">
@@ -105,73 +108,130 @@ export const WithCollapsedNode = (
   />
 )
 
-type TemplateProps = {
-  data: Kin[]
-}
+export const Searchable = (
+  <Demo
+    render={() => {
+      const [query, setQuery] = useState("")
 
-function Template({ data: initialData }: TemplateProps) {
+      const isFilteredOut = useMemo(() => {
+        if (!query.trim()) return undefined
+
+        return (kin: Kin) => {
+          const doesMatch = kebabCase(kin.name).includes(
+            kebabCase(query.trim())
+          )
+
+          return !doesMatch
+        }
+      }, [query])
+
+      return (
+        <div>
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search..."
+          />
+          <Template
+            isFilteredOut={isFilteredOut}
+            data={[
+              buildKin({ id: "bananas" }),
+              buildKin({ id: "green-banana", parentId: "bananas" }),
+              buildKin({ id: "overripe-banana", parentId: "bananas" }),
+              buildKin({ id: "cereals", isCollapsed: true }),
+              buildKin({ id: "honey-nut-cheerios", parentId: "cereals" }),
+              buildKin({ id: "cheerios", parentId: "cereals" }),
+              buildKin({ id: "banana pops", parentId: "cereals" }),
+              buildKin({ id: "flakes", parentId: "cereals" }),
+              buildKin({ id: "corn flakes", parentId: "flakes" }),
+            ]}
+          />
+        </div>
+      )
+    }}
+  />
+)
+
+type OrderedTreeOverrides<Datum> = Partial<UseOrderedTreeArgs<Datum>> &
+  Pick<UseOrderedTreeArgs<Datum>, "data">
+
+function Template({
+  data: initialData,
+  ...overrides
+}: OrderedTreeOverrides<Kin>) {
   const [data, setData] = useState(initialData)
 
   const dump = useDumpDebugData()
 
-  const { roots, getTreeProps, TreeProvider, getKey, isDropping } =
-    useOrderedTree({
-      data,
-      onNodeMove(id, newOrder, newParentId) {
-        const index = data.findIndex((datum) => datum.id === id)
-        const oldDatum = data[index]
+  const {
+    roots,
+    getTreeProps,
+    TreeProvider,
+    getKey,
+    isDropping,
+    isCollapsed,
+    setCollapsed,
+  } = useOrderedTree({
+    data,
+    onNodeMove(id, newOrder, newParentId) {
+      const index = data.findIndex((datum) => datum.id === id)
+      const oldDatum = data[index]
 
-        if (!oldDatum) {
-          throw new Error(`Received order change for missing id ${id}`)
-        }
+      if (!oldDatum) {
+        throw new Error(`Received order change for missing id ${id}`)
+      }
 
-        const newDatum = {
-          ...oldDatum,
-          order: newOrder,
-          parentId: newParentId,
-        }
+      const newDatum = {
+        ...oldDatum,
+        order: newOrder,
+        parentId: newParentId,
+      }
 
-        const newArray = [...data]
-        newArray[index] = newDatum
+      const newArray = [...data]
+      newArray[index] = newDatum
 
-        setTimeout(() => {
-          setData(newArray)
-        }, 500)
-      },
-      onBulkNodeOrder(ordersById) {
-        setData(
-          data.map((kin) => {
-            const newOrder = ordersById[kin.id]
+      setTimeout(() => {
+        setData(newArray)
+      }, 500)
+    },
+    onBulkNodeOrder(ordersById) {
+      setData(
+        data.map((kin) => {
+          const newOrder = ordersById[kin.id]
 
-            if (newOrder === undefined) return kin
+          if (newOrder === undefined) return kin
 
-            return { ...kin, order: newOrder }
-          })
-        )
-      },
-      onClick(clickedKin) {
-        setData((data) =>
-          data.map((kin) => {
-            if (kin.id !== clickedKin.id) {
-              return kin
-            }
+          return { ...kin, order: newOrder }
+        })
+      )
+    },
+    onClick(clickedKin) {
+      const isCollapsedNow = !isCollapsed(clickedKin)
+      setCollapsed(clickedKin, isCollapsedNow)
+      setData((data) =>
+        data.map((kin) => {
+          if (kin.id !== clickedKin.id) {
+            return kin
+          }
 
-            return {
-              ...kin,
-              isCollapsed: !kin.isCollapsed,
-            }
-          })
-        )
-      },
-      getId: (kin) => kin.id,
-      getParentId: (kin) => kin.parentId,
-      getOrder: (kin) => kin.order,
-      compare: (a: Kin, b: Kin) => {
-        return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
-      },
-      isCollapsed: (kin) => kin.isCollapsed,
-      dump,
-    })
+          return {
+            ...kin,
+            isCollapsed: isCollapsedNow,
+          }
+        })
+      )
+    },
+    getId: (kin) => kin.id,
+    getParentId: (kin) => kin.parentId,
+    getOrder: (kin) => kin.order,
+    compare: (a: Kin, b: Kin) => {
+      return new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf()
+    },
+    isCollapsed: (kin) => kin.isCollapsed,
+    dump,
+    ...overrides,
+  })
 
   return (
     <Tree {...getTreeProps()} disabled={isDropping}>
@@ -278,6 +338,7 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     depth,
     isPlaceholder,
     isBeingDragged,
+    doesMatch,
     expansion,
     getKey,
   } = useOrderedTreeNode(kin)
@@ -291,17 +352,21 @@ const TreeRows = ({ kin }: TreeRowsProps) => {
     )
   }
 
+  const style: React.CSSProperties = {
+    background: doesMatch ? "yellow" : undefined,
+  }
+
+  if (expansion !== "no children") {
+    style.fontWeight = 500
+  }
+
   return (
     <>
       <DraggableRow {...getNodeProps()} isBeingDragged={isBeingDragged}>
         {isBeingDragged || (
           <DepthIndicator id={kin.id} depth={depth} expansion={expansion} />
         )}
-        <span
-          style={expansion === "no children" ? undefined : { fontWeight: 500 }}
-        >
-          {kin.name}
-        </span>
+        <span style={style}>{kin.name}</span>
       </DraggableRow>
       {children.map((child) => (
         <TreeRows key={getKey(child)} kin={child} />
@@ -333,13 +398,13 @@ const DepthIndicator = ({ id, depth, expansion }: DepthIndicatorProps) => {
   return expansion === "collapsed" ? (
     <>
       {stars}
-      {BLACK_RIGHT_POINTING_TRIANGLE}
+      <PointerSpan>{BLACK_RIGHT_POINTING_TRIANGLE}</PointerSpan>
       {SPACE}
     </>
   ) : expansion === "expanded" ? (
     <>
       {stars}
-      {BLACK_DOWN_POINTING_TRIANGLE}
+      <PointerSpan>{BLACK_DOWN_POINTING_TRIANGLE}</PointerSpan>
       {SPACE}
     </>
   ) : (
@@ -350,3 +415,7 @@ const DepthIndicator = ({ id, depth, expansion }: DepthIndicatorProps) => {
     </>
   )
 }
+
+const PointerSpan = styled("span", {
+  cursor: "pointer",
+})

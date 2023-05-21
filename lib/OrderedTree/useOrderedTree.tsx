@@ -53,6 +53,7 @@ export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
   onNodeMove(id: string, newOrder: number, newParentId: string | null): void
   onClick?(datum: Datum): void
   onBulkNodeOrder(ordersById: Record<string, number>): void
+  isFilteredOut?(datum: Datum): boolean | undefined
   dump?: DebugDataDumper
 }
 
@@ -72,7 +73,14 @@ type UseOrderedTreeReturnType<Datum> = {
   TreeProvider(this: void, props: { children: React.ReactNode }): JSX.Element
   getKey(this: void, datum: Datum): string
   isDropping: boolean
+  isCollapsed(this: void, datum: Datum): boolean
+  setCollapsed(this: void, datum: Datum, isCollapsed: boolean): void
 }
+
+let renderCount = 0
+let isFilteredOutChangeCount = 0
+let treeCount = 0
+let dataChangeCount = 0
 
 export function useOrderedTree<Datum>({
   data,
@@ -83,6 +91,7 @@ export function useOrderedTree<Datum>({
   getOrder,
   compare,
   isCollapsed,
+  isFilteredOut,
 
   // Callbacks
   dump,
@@ -93,6 +102,36 @@ export function useOrderedTree<Datum>({
   const bulkOrderRef = useRef(onBulkNodeOrder)
   bulkOrderRef.current = onBulkNodeOrder
   const [isDropping, setIsDropping] = useState(false)
+  const [expansionOverrideMask, setExpansionOverrideMask] = useState<
+    Record<string, "masked" | undefined>
+  >({})
+
+  if (renderCount > 10 && renderCount === isFilteredOutChangeCount) {
+    throw new Error(
+      "isFilteredOut is changing with every render. That's not good."
+    )
+  }
+
+  if (renderCount > 10 && renderCount === dataChangeCount) {
+    throw new Error("data is changing with every render. That's not good.")
+  }
+
+  if (renderCount > 10 && renderCount === treeCount) {
+    throw new Error("tree is changing with every render. That's not good.")
+  }
+
+  renderCount++
+
+  useEffect(() => {
+    isFilteredOutChangeCount++
+    // Whenever the filter changes, we revert back to the default expansion
+    // overrides provided by prebuildTree:
+    setExpansionOverrideMask({})
+  }, [isFilteredOut])
+
+  useEffect(() => {
+    dataChangeCount++
+  }, [data])
 
   const datumFunctions = useMemo(
     () => ({
@@ -101,26 +140,39 @@ export function useOrderedTree<Datum>({
       getOrder,
       compare,
       isCollapsed,
+      isFilteredOut,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [isFilteredOut]
   )
 
   const [tree, setTree] = useState(() =>
     buildTree({
       data,
+      expansionOverrideMask,
       ...datumFunctions,
     })
   )
+
+  useEffect(() => {
+    treeCount++
+    if (isEmpty(tree.missingOrdersById)) return
+
+    bulkOrderRef.current(tree.missingOrdersById)
+  }, [tree])
 
   const [model] = useState(
     () =>
       new OrderedTreeModel({
         tree: tree,
-        getParentId,
-        getOrder,
-        getId,
-        isCollapsed,
+        functions: {
+          getParentId,
+          getOrder,
+          getId,
+          isCollapsed,
+          isFilteredOut,
+          compare,
+        },
         dump,
         onNodeMove,
         onDroppingChange: setIsDropping,
@@ -128,6 +180,32 @@ export function useOrderedTree<Datum>({
         collapseNode: () => {},
         expandNode: () => {},
       })
+  )
+
+  const isFirstRenderRef = useRef(true)
+
+  useEffect(() => {
+    model.setFunctions(datumFunctions)
+  }, [model, datumFunctions])
+
+  useEffect(
+    function rebuildTree() {
+      if (isFirstRenderRef.current) {
+        // We don't need to rebuild the tree on the first render
+        isFirstRenderRef.current = false
+        return
+      }
+
+      const newTree = buildTree({
+        data,
+        expansionOverrideMask,
+        ...datumFunctions,
+      })
+
+      setTree(newTree)
+      model.setTree(newTree)
+    },
+    [data, model, datumFunctions, expansionOverrideMask]
   )
 
   const [TreeProvider] = useState(
@@ -152,30 +230,6 @@ export function useOrderedTree<Datum>({
     model,
     false
   )
-
-  const isFirstRenderRef = useRef(true)
-
-  useEffect(() => {
-    if (isFirstRenderRef.current) {
-      // We don't need to rebuild the tree on the first render
-      isFirstRenderRef.current = false
-      return
-    }
-
-    const newTree = buildTree({
-      data,
-      ...datumFunctions,
-    })
-
-    setTree(newTree)
-    model.setTree(newTree)
-  }, [data, model, datumFunctions])
-
-  useEffect(() => {
-    if (isEmpty(tree.missingOrdersById)) return
-
-    bulkOrderRef.current(tree.missingOrdersById)
-  }, [tree])
 
   const observedNodeRef = useRef<HTMLElement | null>(null)
   const [treeObserver] = useState(
@@ -240,12 +294,25 @@ export function useOrderedTree<Datum>({
     return model.getKey(datum)
   }
 
+  function setCollapsed(datum: Datum, isCollapsedNow: boolean) {
+    model.setCollapsed(datum, isCollapsedNow)
+
+    const nodeId = getId(datum)
+
+    setExpansionOverrideMask({
+      ...expansionOverrideMask,
+      [nodeId]: "masked",
+    })
+  }
+
   return {
     roots: rootsWithPlaceholder,
     getTreeProps,
     TreeProvider,
     getKey,
     isDropping,
+    isCollapsed: (datum) => model.getExpansion(datum) === "collapsed",
+    setCollapsed,
   }
 }
 
@@ -261,13 +328,14 @@ export function TreeProvider<Datum>({
 
 type UseOrderedTreeNodeReturnType<Datum> = {
   children: Datum[]
-  getNodeProps: GetNodeProps
   depth: number
+  expansion: "expanded" | "collapsed" | "no children"
+  getNodeProps: GetNodeProps
+  getKey: (datum: Datum) => string
+  isPlaceholder: boolean
   isBeingDragged: boolean
   hasChildren: boolean
-  expansion: "expanded" | "collapsed" | "no children"
-  isPlaceholder: boolean
-  getKey: (datum: Datum) => string
+  doesMatch: boolean
 }
 
 export function useOrderedTreeNode<Datum>(
@@ -309,15 +377,18 @@ export function useOrderedTreeNode<Datum>(
 
   const getKey = useCallback((datum: Datum) => model.getKey(datum), [model])
 
+  const doesMatch = model.doesMatch(datum)
+
   return {
     children,
     expansion,
-    getNodeProps,
     depth,
+    getNodeProps,
+    getKey,
     isBeingDragged,
     isPlaceholder,
     hasChildren,
-    getKey,
+    doesMatch,
   }
 }
 
@@ -353,7 +424,7 @@ function useParent<Datum>(
     }
     if (!Object.prototype.hasOwnProperty.call(parent, "__isRhahPlaceholder")) {
       throw new Error(
-        `Tried to use placeholder parent, but datum with id ${model.data.getId(
+        `Tried to use placeholder parent, but datum with id ${model.functions.getId(
           parent
         )} wasn't tagged as a placeholder`
       )
@@ -379,7 +450,7 @@ function useParent<Datum>(
     }))
   }, [model, parent])
 
-  const parentId = parent ? model.data.getId(parent) : null
+  const parentId = parent ? model.functions.getId(parent) : null
 
   useEffect(() => {
     if (isPlaceholder) return
@@ -433,7 +504,11 @@ function useParent<Datum>(
         }
 
         const siblings = removeId
-          ? removeSibling([...originalChildren], removeId, model.data.getId)
+          ? removeSibling(
+              [...originalChildren],
+              removeId,
+              model.functions.getId
+            )
           : [...originalChildren]
 
         const data = spliceSibling({
@@ -449,7 +524,11 @@ function useParent<Datum>(
       }
 
       if (removeId !== undefined) {
-        return removeSibling([...originalChildren], removeId, model.data.getId)
+        return removeSibling(
+          [...originalChildren],
+          removeId,
+          model.functions.getId
+        )
       }
 
       return originalChildren
