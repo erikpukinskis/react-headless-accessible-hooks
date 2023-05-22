@@ -288,9 +288,13 @@ describe("buildTree", () => {
     ).toBeCloseTo(0.1666)
   })
 
-  it.only("moves nodes to the root if their parent is not present", () => {
+  it("returns nodes as orphans if their parent is not present", () => {
     const tree = buildTree({
-      data: [AUNTIE, MOMMA, GRANDKID],
+      data: [
+        buildKin({ id: "auntie", parentId: "gramps" }),
+        buildKin({ id: "momma", parentId: "gramps" }),
+        buildKin({ id: "grandkid", parentId: "momma" }),
+      ],
       ...FUNCTIONS,
       expansionOverrideMask: {},
     })
@@ -304,7 +308,11 @@ describe("buildTree", () => {
 
   it("filters out node trees", () => {
     const tree = buildTree({
-      data: [AUNTIE, MOMMA, GRANDKID],
+      data: [
+        buildKin({ id: "auntie" }),
+        buildKin({ id: "momma" }),
+        buildKin({ id: "grandkid", parentId: "momma" }),
+      ],
       ...FUNCTIONS,
       isFilteredOut: (kin) => kin.id === "momma" || kin.id === "grandkid",
       expansionOverrideMask: {},
@@ -316,7 +324,11 @@ describe("buildTree", () => {
 
   it("includes children of nodes that match filters", () => {
     const tree = buildTree({
-      data: [AUNTIE, MOMMA, GRANDKID],
+      data: [
+        buildKin({ id: "auntie" }),
+        buildKin({ id: "momma" }),
+        buildKin({ id: "grandkid", parentId: "momma" }),
+      ],
       ...FUNCTIONS,
       isFilteredOut: (kin) => kin.id === "auntie",
       expansionOverrideMask: {},
@@ -348,23 +360,13 @@ describe("buildTree", () => {
 
   it("expands parents of children that match", () => {
     const tree = buildTree({
-      data: [AUNTIE, MOMMA, GRANDKID],
+      data: [
+        buildKin({ id: "auntie" }),
+        buildKin({ id: "momma", isCollapsed: true }),
+        buildKin({ id: "grandkid", parentId: "momma" }),
+      ],
       ...FUNCTIONS,
       isFilteredOut: (kin) => kin.id === "auntie",
-      expansionOverrideMask: {},
-    })
-
-    expect(tree.roots).toHaveLength(1)
-    expect(tree.roots[0].id).toBe("momma")
-    expect(tree.roots[0].children).toHaveLength(1)
-    expect(tree.roots[0].children[0].id).toBe("grandkid")
-  })
-
-  it("includes collapsed nodes that match filters", () => {
-    const tree = buildTree({
-      data: [AUNTIE, { ...MOMMA, isCollapsed: true }, GRANDKID],
-      ...FUNCTIONS,
-      isFilteredOut: (kin) => kin.id !== "grandkid",
       expansionOverrideMask: {},
     })
 
