@@ -13,6 +13,7 @@ export type DatumFunctions<Datum> = {
 export type OrderedTreeBuild<Datum> = Readonly<{
   roots: OrderedTreeNode<Datum>[]
   rootData: Datum[]
+  orphanData: Datum[]
   treeSize: number
   missingOrdersById: Record<string, number>
   expansionOverrides: Record<string, "expanded" | "collapsed" | undefined>
@@ -37,13 +38,14 @@ export function buildTree<Datum>({
   const nodesById: Record<string, OrderedTreeNode<Datum>> = {}
   const indexesById: Record<string, number> = {}
 
-  const { hasChildrenFilteredIn, rootData, expansionOverrides } = prebuildTree({
-    data,
-    isFilteredOut,
-    getParentId: datumFunctions.getParentId,
-    getId: datumFunctions.getId,
-    isCollapsed: datumFunctions.isCollapsed,
-  })
+  const { hasChildrenFilteredIn, rootData, orphanData, expansionOverrides } =
+    prebuildTree({
+      data,
+      isFilteredOut,
+      getParentId: datumFunctions.getParentId,
+      getId: datumFunctions.getId,
+      isCollapsed: datumFunctions.isCollapsed,
+    })
 
   const isCollapsed = (datum: Datum) => {
     const id = datumFunctions.getId(datum)
@@ -70,6 +72,7 @@ export function buildTree<Datum>({
 
   const build: OrderedTreeBuild<Datum> = {
     roots: nodes,
+    orphanData,
     rootData,
     missingOrdersById,
     expansionOverrides,
@@ -140,15 +143,24 @@ export function prebuildTree<Datum>({
       })
     : {}
 
-  const rootData = data.filter((datum) => {
+  const rootData = []
+  const orphanData = []
+
+  for (const datum of data) {
     const parentId = getParentId(datum)
+    const isRoot = parentId === null
 
-    const isRoot = parentId === null || !dataById[parentId]
+    if (parentId && !dataById[parentId]) {
+      orphanData.push(datum)
+      continue
+    }
 
-    return isRoot && hasChildrenFilteredIn[getId(datum)]
-  })
+    if (isRoot && hasChildrenFilteredIn[getId(datum)]) {
+      rootData.push(datum)
+    }
+  }
 
-  return { hasChildrenFilteredIn, rootData, expansionOverrides }
+  return { hasChildrenFilteredIn, rootData, orphanData, expansionOverrides }
 }
 
 type FindExpansionOverridesArgs<Datum> = {

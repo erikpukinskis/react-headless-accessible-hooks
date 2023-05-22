@@ -69,6 +69,7 @@ type GetNodeProps = () => {
 
 type UseOrderedTreeReturnType<Datum> = {
   roots: Datum[]
+  orphans: Datum[]
   getTreeProps: GetTreeProps
   TreeProvider(this: void, props: { children: React.ReactNode }): JSX.Element
   getKey(this: void, datum: Datum): string
@@ -313,6 +314,7 @@ export function useOrderedTree<Datum>({
     isDropping,
     isCollapsed: (datum) => model.getExpansion(datum) === "collapsed",
     setCollapsed,
+    orphans: tree.orphanData,
   }
 }
 
