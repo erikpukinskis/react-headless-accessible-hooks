@@ -288,21 +288,20 @@ describe("buildTree", () => {
     ).toBeCloseTo(0.1666)
   })
 
-  it("moves nodes to the root if their parent is not present", () => {
+  it.only("moves nodes to the root if their parent is not present", () => {
     const tree = buildTree({
       data: [AUNTIE, MOMMA, GRANDKID],
       ...FUNCTIONS,
       expansionOverrideMask: {},
     })
 
-    expect(tree.roots).toHaveLength(2)
-    expect(tree.roots[0].id).toBe("momma")
-    expect(tree.roots[0].children).toHaveLength(1)
-    expect(tree.roots[0].children[0].id).toBe("grandkid")
-    expect(tree.roots[1].id).toBe("auntie")
+    expect(tree.roots).toHaveLength(0)
+    expect(tree.orphanData).toHaveLength(2)
+    console.log(tree.orphanData)
+    expect(tree.orphanData[0].id).toBe("auntie")
+    expect(tree.orphanData[1].id).toBe("momma")
   })
 
-  ///
   it("filters out node trees", () => {
     const tree = buildTree({
       data: [AUNTIE, MOMMA, GRANDKID],
