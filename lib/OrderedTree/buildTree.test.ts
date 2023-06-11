@@ -301,7 +301,6 @@ describe("buildTree", () => {
 
     expect(tree.roots).toHaveLength(0)
     expect(tree.orphanData).toHaveLength(2)
-    console.log(tree.orphanData)
     expect(tree.orphanData[0].id).toBe("auntie")
     expect(tree.orphanData[1].id).toBe("momma")
   })

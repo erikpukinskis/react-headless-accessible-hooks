@@ -459,7 +459,6 @@ function useParent<Datum>(
 
     const handleNodeChange: NodeListener = (change) => {
       setState((oldState) => {
-        console.log(parentId, change, { oldState })
         return { ...oldState, ...change }
       })
     }

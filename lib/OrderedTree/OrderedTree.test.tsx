@@ -132,7 +132,6 @@ describe("OrderedTree", () => {
 
     expect(tree).toHaveTextContent("- First;- Placeholder for Second;- Second;")
 
-    console.log("mouseUp")
     fireEvent.mouseUp(rows[1], {
       clientX: 7,
       clientY: 30,
