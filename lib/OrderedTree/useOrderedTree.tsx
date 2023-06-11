@@ -349,16 +349,10 @@ export function useOrderedTreeNode<Datum>(
   // corresponding node. So this node is the node for the original datum, and
   // node.data will be a different object than the placeholder datum:
   const node = model.getNode(datum)
-  const isBeingDragged = model.isBeingDragged(datum)
   const isPlaceholder = model.isPlaceholder(datum)
-  const childIsBeingDragged = model.childIsBeingDragged(node.id)
 
-  const { children, expansion } = useParent(
-    node.children,
-    datum,
-    model,
-    isPlaceholder
-  )
+  const { children, expansion, isBeingDragged, childIsBeingDragged } =
+    useParent(node.children, datum, model, isPlaceholder)
 
   const getNodeProps = useCallback<GetNodeProps>(() => {
     return {
@@ -397,12 +391,16 @@ export function useOrderedTreeNode<Datum>(
 type UseParentReturnType<Datum> = {
   children: Datum[]
   expansion: "expanded" | "collapsed" | "no children"
+  isBeingDragged: boolean
+  childIsBeingDragged: boolean
 }
 
 type ParentState = {
   placeholderOrder: number | null
   expansion: "expanded" | "collapsed" | "no children"
   isDropping: boolean
+  isBeingDragged: boolean
+  childIsBeingDragged: boolean
 }
 
 /**
@@ -440,6 +438,8 @@ function useParent<Datum>(
       placeholderOrder: null,
       expansion,
       isDropping: false,
+      isBeingDragged: false,
+      childIsBeingDragged: false,
     }
   })
 
@@ -459,6 +459,7 @@ function useParent<Datum>(
 
     const handleNodeChange: NodeListener = (change) => {
       setState((oldState) => {
+        console.log(parentId, change, { oldState })
         return { ...oldState, ...change }
       })
     }
@@ -541,6 +542,8 @@ function useParent<Datum>(
   return {
     children,
     expansion: state.expansion,
+    isBeingDragged: state.isBeingDragged,
+    childIsBeingDragged: state.childIsBeingDragged,
   }
 }
 

@@ -498,15 +498,30 @@ export class OrderedTreeModel<Datum> {
       newDepth = dragData.relativeTo.parents.length
     }
 
+    const didMove =
+      dragData.dragDirection !== "nowhere" ||
+      newDepth !== this.dragStart.originalDepth
+
     const newDragEnd = {
+      didMove,
       order: newOrder,
       parentId: newParentId,
       newDepth,
+      dragDistance: Math.abs(dx * dx + dy * dy),
     }
 
     if (isEqual(this.dragEnd, newDragEnd)) return
 
     const { dragEnd, dragStart } = this
+
+    const dragJustStarted = !this.dragEnd
+
+    if (dragJustStarted) {
+      this.notifyNodeOfChange(dragStart.node.id, { isBeingDragged: true })
+      this.notifyNodeOfChange(this.functions.getParentId(dragStart.node.data), {
+        childIsBeingDragged: true,
+      })
+    }
 
     this.dragEnd = newDragEnd
 
@@ -616,6 +631,7 @@ export class OrderedTreeModel<Datum> {
       clientY: this.clientY,
       treeBox: this.treeBox,
       originalOrder: this.getOrder(node.data),
+      originalDepth: node.parents.length,
       mouseMoveHandler,
       mouseUpHandler,
     }
@@ -631,48 +647,52 @@ export class OrderedTreeModel<Datum> {
       throw new Error("Got a mouseup event but drag never started")
     }
 
-    if (!dragEnd) {
-      // The mouse never moved
-
-      const { dragStart } = this
-
-      if (!dragStart) {
-        throw new Error("Received a mouse up, but drag was never started?")
-      }
-
-      this.dragStart = undefined
-      this.onClick?.(dragStart.node.data)
-
-      window.removeEventListener("mouseup", dragStart.mouseUpHandler)
-      window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
-
-      return
-    }
-
-    this.isDropping = true
-    this.onDroppingChange(true)
+    window.removeEventListener("mouseup", dragStart.mouseUpHandler)
+    window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
 
     // Reset the drag node back like it was (expanded or collapsed or whatever)
     this.notifyNodeOfChange(dragStart.node.id, {
       expansion: this.getExpansion(dragStart.node.data),
     })
 
-    if (dragEnd.parentId !== undefined) {
-      const originalParentId = this.functions.getParentId(dragStart.node.data)
-
-      this.notifyNodeOfChange(originalParentId, { isDropping: true })
-
-      this.onNodeMove(dragStart.node.id, dragEnd.order, dragEnd.parentId)
+    if (!dragEnd || dragEnd.dragDistance < 2) {
+      // The cursor didn't move (much) so we consider this a click
+      this.onClick?.(dragStart.node.data)
+      this.finishDrop()
+      return
     }
 
-    window.removeEventListener("mouseup", dragStart.mouseUpHandler)
-    window.removeEventListener("mousemove", dragStart.mouseMoveHandler)
+    if (!dragEnd.didMove) {
+      // We moved the cursor, but not far enough to move a node
+      this.finishDrop()
+      return
+    }
+
+    if (dragEnd.parentId === undefined) {
+      // We dragged out of the tree, so we just reset things back to the
+      // original state and don't fire any events.
+      this.finishDrop()
+      return
+    }
+
+    // If we got here, we did move something, so we enter a "dropping" state
+    // where we ignore mouse events and wait for the tree to be updated via
+    // setTree. When that happens we'll call finishDrop and we'll start
+    // listening for drags again.
+
+    this.isDropping = true
+    this.onDroppingChange(true)
+
+    const originalParentId = this.functions.getParentId(dragStart.node.data)
+
+    this.onNodeMove(dragStart.node.id, dragEnd.order, dragEnd.parentId)
+    this.notifyNodeOfChange(originalParentId, { isDropping: true })
 
     if (isLackingPrecision(dragEnd.order)) {
       throw new Error(
         `Hit the minimum precision on a tree node order (on id ${this.functions.getId(
           dragStart.node.data
-        )}). We should defragment here, but RHAH doesn't support that yet`
+        )}). We should defragment here, but useOrderedTree doesn't support that yet`
       )
     }
   }
@@ -682,37 +702,39 @@ export class OrderedTreeModel<Datum> {
 
     // We reset the drag first, just in case something goes wrong with the drop
     // below, the user can at least try to limp along and do another drag
+    const wasDropping = this.isDropping
     this.isDropping = false
     this.dragStart = undefined
     this.dragEnd = undefined
 
-    this.onDroppingChange(false)
+    if (wasDropping) this.onDroppingChange(false)
 
     if (!dragStart) {
       throw new Error("Could not find dragStart in dropping state")
     }
 
     if (!dragEnd) {
-      throw new Error("Could not find dragEnd in dropping state")
+      return
     }
 
-    if (dragEnd.parentId === undefined) {
-      throw new Error(
-        "In dropping state even though the drag ended outside the tree"
-      )
+    if (dragEnd.parentId !== undefined) {
+      this.notifyNodeOfChange(dragEnd.parentId, {
+        placeholderOrder: null,
+        expansion:
+          dragEnd.parentId === null
+            ? "expanded"
+            : this.getExpansion(this.tree.nodesById[dragEnd.parentId].data),
+      })
     }
-
-    this.notifyNodeOfChange(dragEnd.parentId, {
-      placeholderOrder: null,
-      expansion:
-        dragEnd.parentId === null
-          ? "expanded"
-          : this.getExpansion(this.tree.nodesById[dragEnd.parentId].data),
-    })
 
     const originalParentId = this.functions.getParentId(dragStart.node.data)
 
-    this.notifyNodeOfChange(originalParentId, { isDropping: false })
+    this.notifyNodeOfChange(dragStart.node.id, { isBeingDragged: false })
+
+    this.notifyNodeOfChange(originalParentId, {
+      isDropping: false,
+      childIsBeingDragged: false,
+    })
   }
 }
 
@@ -726,6 +748,7 @@ type DragStart<Datum> = {
   clientY: number
   treeBox: TreeBox
   originalOrder: number
+  originalDepth: number
   mouseMoveHandler(this: void, event: MouseEvent): void
   mouseUpHandler(this: void): void
 }
@@ -753,12 +776,22 @@ export type DragEnd = {
    * The new depth of the node if we dropped it here
    */
   newDepth: number
+  /**
+   * Whether the drag moved anything anywhere
+   */
+  didMove: boolean
+  /**
+   * How far the cursor was dragged while down
+   */
+  dragDistance: number
 }
 
 type NodeChange = {
   expansion?: "expanded" | "collapsed" | "no children"
   placeholderOrder?: number | null
   isDropping?: boolean
+  isBeingDragged?: boolean
+  childIsBeingDragged?: boolean
 }
 
 export type NodeListener = (change: NodeChange) => void
