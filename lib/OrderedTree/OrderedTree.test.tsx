@@ -84,6 +84,67 @@ describe("OrderedTree", () => {
     expect(tree).toHaveTextContent("- Second;- First;")
   })
 
+  it("doesn't fire onNodeMove if we drag nowhere", () => {
+    const moveNode = vi.fn()
+
+    const first = buildKin({ id: "first", order: 0.4, parentId: null })
+    const second = buildKin({ id: "second", order: 0.6, parentId: null })
+
+    const { rows, tree } = renderTree({
+      data: [first, second],
+      onNodeMove: moveNode,
+    })
+
+    layout.resize(tree, {
+      contentRect: {
+        width: 200,
+        height: 40,
+        left: 0,
+        top: 0,
+      },
+    })
+
+    expect(tree).toHaveTextContent("- First;- Second;")
+
+    layout.mockListBoundingRects(rows, {
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 20,
+    })
+
+    fireEvent.mouseDown(rows[1], {
+      clientX: 10,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(rows[1], {
+      clientX: 7,
+      clientY: 30,
+    })
+
+    fireEvent.mouseMove(rows[1], {
+      clientX: 6,
+      clientY: 30,
+    })
+
+    expect(rows[1]).toHaveAttribute("class", "dragging")
+
+    expect(tree).toHaveTextContent("- First;- Placeholder for Second;- Second;")
+
+    console.log("mouseUp")
+    fireEvent.mouseUp(rows[1], {
+      clientX: 7,
+      clientY: 30,
+    })
+
+    expect(moveNode).not.toHaveBeenCalled()
+
+    expect(rows[0]).not.toHaveAttribute("class", "dragging")
+
+    expect(tree).toHaveTextContent("- First;- Second;")
+  })
+
   it("leaves placeholder in the tree until an update", () => {
     const onNodeMove = vi.fn()
     let opacity = "1"
@@ -1008,8 +1069,15 @@ type KinNodeProps = {
  * which is the way to get the tree state relating to a specific node.
  */
 function KinNode({ kin }: KinNodeProps) {
-  const { children, getNodeProps, depth, isPlaceholder, expansion, getKey } =
-    useOrderedTreeNode(kin)
+  const {
+    children,
+    getNodeProps,
+    depth,
+    isPlaceholder,
+    isBeingDragged,
+    expansion,
+    getKey,
+  } = useOrderedTreeNode(kin)
 
   const prefix = `${[...(Array(depth) as unknown[])].map(() => "-").join("")}${
     expansion === "collapsed" ? ">" : expansion === "expanded" ? "v" : "-"
@@ -1025,7 +1093,10 @@ function KinNode({ kin }: KinNodeProps) {
 
   return (
     <>
-      <div {...getNodeProps()}>
+      <div
+        {...getNodeProps()}
+        className={isBeingDragged ? "dragging" : undefined}
+      >
         {prefix} {kin.name};
       </div>
       {children.map((child) => (
