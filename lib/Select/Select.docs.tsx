@@ -78,7 +78,9 @@ function Template({ minQueryLength }: TemplateProps) {
     data: matchingItems,
     label: "Items",
     getOptionValue: (item) => item.id,
-    onSelect: (item) => setSelectedId(item.id),
+    onSelect: (item) => {
+      setSelectedId(item.id)
+    },
   })
 
   return (

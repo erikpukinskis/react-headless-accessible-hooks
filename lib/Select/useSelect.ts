@@ -5,7 +5,9 @@ type SelectOptions<Datum> = {
   label: string
   onInputChange?: (value: string) => void
   getOptionValue: (item: Datum) => string
-  onSelect?: (item: Datum) => void
+  onSelect?: (
+    item: Datum
+  ) => boolean | void | undefined | Promise<boolean | void | undefined>
   minQueryLength?: number
 }
 
@@ -44,9 +46,10 @@ export const useSelect = <Datum>({
     [highlightedIndex, data, getOptionValue]
   )
 
-  const selectItem = (item: Datum) => {
+  const selectItem = async (item: Datum) => {
+    const hide = await onSelect?.(item)
+    if (hide === false) return
     setHidden(true)
-    onSelect?.(item)
   }
 
   const handleKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -73,7 +76,7 @@ export const useSelect = <Datum>({
       event.preventDefault()
     } else if (event.key === "Enter") {
       event.preventDefault()
-      selectItem(data[highlightedIndex])
+      void selectItem(data[highlightedIndex])
     } else if (event.key === "ArrowUp") {
       event.preventDefault()
       if (highlightedIndex < 1) return
@@ -91,8 +94,7 @@ export const useSelect = <Datum>({
 
   const handleOptionClick = (item: Datum) => {
     didMouseDownOnOptionRef.current = false
-    selectItem(item)
-    setHidden(true)
+    void selectItem(item)
   }
 
   const isExpanded = (items: Datum[] | undefined): items is Datum[] => {
