@@ -19,8 +19,29 @@ export const useSelect = <Datum>({
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
-  const inputIsFocusedRef = useRef(false)
   const didMouseDownOnOptionRef = useRef(false)
+  const [focusedElementCount, setFocusedElementCount] = useState(0)
+  const focusedElementCountRef = useRef<number | undefined>()
+
+  const focus = (addingFocus: boolean) => {
+    const oldCount = focusedElementCountRef.current ?? 0
+    const newCount = addingFocus ? oldCount + 1 : oldCount - 1
+
+    focusedElementCountRef.current = newCount
+
+    setFocusedElementCount(newCount)
+  }
+
+  useEffect(() => {
+    if (focusedElementCountRef.current === undefined) return
+
+    setTimeout(() => {
+      if (focusedElementCountRef.current === 0) {
+        console.log("clicked away!")
+        setHidden(true)
+      }
+    })
+  }, [focusedElementCount])
 
   const valuesHash = useMemo(() => {
     return data?.map(getOptionValue).join("-----")
@@ -28,10 +49,6 @@ export const useSelect = <Datum>({
 
   useEffect(() => {
     setHighlightedIndex(0)
-
-    // if (inputIsFocusedRef.current) {
-    //   setHidden(false)
-    // }
   }, [valuesHash])
 
   const activeDescendantId = useMemo(
@@ -60,8 +77,6 @@ export const useSelect = <Datum>({
 
     if (!data || data.length < 1) return
 
-    setHidden(false)
-
     if (
       event.key === "PageUp" ||
       (event.key === "ArrowLeft" && event.metaKey)
@@ -78,18 +93,19 @@ export const useSelect = <Datum>({
       event.preventDefault()
       void selectItem(data[highlightedIndex])
     } else if (event.key === "ArrowUp") {
+      console.log("up!")
       event.preventDefault()
-      if (highlightedIndex < 1) return
-      setHighlightedIndex((index) => index - 1)
+      if (highlightedIndex === 0) return
+      else if (isHidden) setHighlightedIndex(data.length - 1)
+      else setHighlightedIndex((index) => index - 1)
     } else if (event.key === "ArrowDown") {
       event.preventDefault()
-
       if (highlightedIndex >= data.length - 1) return
-
-      setHighlightedIndex((index) => {
-        return index + 1
-      })
+      else if (isHidden) setHighlightedIndex(0)
+      else setHighlightedIndex((index) => index + 1)
     }
+
+    setHidden(false)
   }
 
   const handleOptionClick = (item: Datum) => {
@@ -112,14 +128,11 @@ export const useSelect = <Datum>({
       "role": "combobox",
       "aria-expanded": isExpanded(data),
       "onFocus": () => {
-        inputIsFocusedRef.current = true
+        focus(true)
         setHidden(false)
       },
       "onBlur": () => {
-        if (didMouseDownOnOptionRef.current) return
-
-        inputIsFocusedRef.current = false
-        setHidden(true)
+        focus(false)
       },
       "aria-activedescendant": activeDescendantId,
       "onKeyDownCapture": handleKeys,
@@ -127,6 +140,12 @@ export const useSelect = <Datum>({
     getListboxProps: () => ({
       "role": "listbox",
       "aria-label": label,
+      onFocus: () => {
+        focus(true)
+      },
+      onBlur: () => {
+        focus(false)
+      },
     }),
     getOptionProps: (item: Datum) => ({
       "role": "option",
