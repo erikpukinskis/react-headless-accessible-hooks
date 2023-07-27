@@ -7,7 +7,6 @@ type SelectOptions<Datum> = {
   getOptionValue: (item: Datum) => string
   onSelect?: (item: Datum) => void
   minQueryLength?: number
-  closeOnBlur?: boolean
 }
 
 export const useSelect = <Datum>({
@@ -15,19 +14,23 @@ export const useSelect = <Datum>({
   label,
   getOptionValue,
   onSelect,
-  closeOnBlur = true,
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
   const inputIsFocusedRef = useRef(false)
+  const didMouseDownOnOptionRef = useRef(false)
+
+  const valuesHash = useMemo(() => {
+    return data?.map(getOptionValue).join("-----")
+  }, [data, getOptionValue])
 
   useEffect(() => {
     setHighlightedIndex(0)
 
-    if (inputIsFocusedRef.current) {
-      setHidden(false)
-    }
-  }, [data])
+    // if (inputIsFocusedRef.current) {
+    //   setHidden(false)
+    // }
+  }, [valuesHash])
 
   const activeDescendantId = useMemo(
     function updateActiveDescendant() {
@@ -54,6 +57,8 @@ export const useSelect = <Datum>({
 
     if (!data || data.length < 1) return
 
+    setHidden(false)
+
     if (
       event.key === "PageUp" ||
       (event.key === "ArrowLeft" && event.metaKey)
@@ -76,8 +81,6 @@ export const useSelect = <Datum>({
     } else if (event.key === "ArrowDown") {
       event.preventDefault()
 
-      if (isHidden) setHidden(false)
-
       if (highlightedIndex >= data.length - 1) return
 
       setHighlightedIndex((index) => {
@@ -86,14 +89,10 @@ export const useSelect = <Datum>({
     }
   }
 
-  const handleOptionClick = (item: Datum, event: React.MouseEvent) => {
-    // We prevent default because we don't want clicking on an option to steal
-    // the focus. If it did, you would end up in a situation where the search
-    // input loses focus which closes the menu, and the option is gone before
-    // the click on it can even register.
-    event.preventDefault()
-
+  const handleOptionClick = (item: Datum) => {
+    didMouseDownOnOptionRef.current = false
     selectItem(item)
+    setHidden(true)
   }
 
   const isExpanded = (items: Datum[] | undefined): items is Datum[] => {
@@ -115,8 +114,9 @@ export const useSelect = <Datum>({
         setHidden(false)
       },
       "onBlur": () => {
+        if (didMouseDownOnOptionRef.current) return
+
         inputIsFocusedRef.current = false
-        if (!closeOnBlur) return
         setHidden(true)
       },
       "aria-activedescendant": activeDescendantId,
@@ -128,7 +128,10 @@ export const useSelect = <Datum>({
     }),
     getOptionProps: (item: Datum) => ({
       "role": "option",
-      "onMouseDown": handleOptionClick.bind(null, item),
+      "onClick": handleOptionClick.bind(null, item),
+      "onMouseDown": () => {
+        didMouseDownOnOptionRef.current = true
+      },
       "onMouseOver": () => {
         if (!data) {
           throw new Error("Moused over an option but there was no select data")

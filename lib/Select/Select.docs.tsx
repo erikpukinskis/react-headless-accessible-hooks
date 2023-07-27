@@ -40,7 +40,6 @@ const SelectItem = styled("div", {
 
 type TemplateProps = {
   minQueryLength: number
-  closeOnBlur?: boolean
 }
 
 // Items can be any type. You just need to provide a getOptionId function
@@ -52,7 +51,7 @@ const ITEMS = [
   { id: "four", label: "Fourth Item" },
 ]
 
-function Template({ minQueryLength, closeOnBlur }: TemplateProps) {
+function Template({ minQueryLength }: TemplateProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>()
 
   const [query, setQuery] = useState("")
@@ -80,7 +79,6 @@ function Template({ minQueryLength, closeOnBlur }: TemplateProps) {
     label: "Items",
     getOptionValue: (item) => item.id,
     onSelect: (item) => setSelectedId(item.id),
-    closeOnBlur,
   })
 
   return (
@@ -94,7 +92,7 @@ function Template({ minQueryLength, closeOnBlur }: TemplateProps) {
         {...getInputProps()}
       />
       <br />
-      Selected id: {selectedId ?? "undefined"}
+      Selected: {selectedId ?? "none"}
       {isExpanded && (
         <div {...getListboxProps()}>
           {matchingItems.map((item) => (
@@ -121,5 +119,68 @@ export const OpenOnFocus = (
 )
 
 export const Blurable = (
-  <Demo render={Template} props={{ minQueryLength: 0, closeOnBlur: false }} />
+  <Demo
+    render={() => {
+      const [query, setQuery] = useState("")
+      const [selected, setSelected] = useState("")
+      const [previewed, setPreviewed] = useState("")
+
+      const data = [
+        "Lithium-burning",
+        "Carbon-burning",
+        "Neon-burning",
+        "Oxygen-burning",
+      ]
+
+      const {
+        getInputProps,
+        getListboxProps,
+        getOptionProps,
+        isHighlighted,
+        isExpanded,
+      } = useSelect({
+        data,
+        label: "Items",
+        getOptionValue: (item) => item,
+        onSelect: setSelected,
+      })
+
+      const handleStarClick =
+        (starType: string) => (event: React.MouseEvent) => {
+          event.stopPropagation()
+          setPreviewed(starType)
+        }
+
+      return (
+        <div>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search items"
+            {...getInputProps()}
+          />
+          <br />
+          Selected: {selected ?? "none"}
+          <br />
+          Previewed: {previewed ?? "none"}
+          {isExpanded && (
+            <div {...getListboxProps()}>
+              {data.map((starType) => (
+                <SelectItem
+                  key={starType}
+                  {...getOptionProps(starType)}
+                  highlighted={isHighlighted(starType)}
+                >
+                  {starType}{" "}
+                  <button onClick={handleStarClick(starType)}>preview</button>
+                </SelectItem>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }}
+  />
 )
