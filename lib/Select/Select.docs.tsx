@@ -144,7 +144,9 @@ export const Blurable = (
         data,
         label: "Items",
         getOptionValue: (item) => item,
-        onSelect: setSelected,
+        onSelect: (value) => {
+          setSelected(value)
+        },
       })
 
       const handleStarClick =

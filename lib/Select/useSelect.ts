@@ -36,9 +36,9 @@ export const useSelect = <Datum>({
     if (focusedElementCountRef.current === undefined) return
 
     setTimeout(() => {
-      if (focusedElementCountRef.current === 0) {
-        setHidden(true)
-      }
+      if (focusedElementCountRef.current) return
+      if (didMouseDownOnOptionRef.current) return
+      setHidden(true)
     })
   }, [focusedElementCount])
 
@@ -150,6 +150,11 @@ export const useSelect = <Datum>({
       "onClick": handleOptionClick.bind(null, item),
       "onMouseDown": () => {
         didMouseDownOnOptionRef.current = true
+      },
+      "onMouseUp": () => {
+        setTimeout(() => {
+          didMouseDownOnOptionRef.current = false
+        })
       },
       "onMouseOver": () => {
         if (!data) {
