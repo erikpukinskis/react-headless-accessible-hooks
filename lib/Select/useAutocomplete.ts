@@ -52,7 +52,7 @@ export function useAutocomplete<Datum>({
   return { query, setQuery, matches }
 }
 
-type AddOption = {
+export type AddOption = {
   __isAutocompleteAddOption: true
   text: string
 }

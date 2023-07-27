@@ -37,7 +37,6 @@ export const useSelect = <Datum>({
 
     setTimeout(() => {
       if (focusedElementCountRef.current === 0) {
-        console.log("clicked away!")
         setHidden(true)
       }
     })
@@ -93,7 +92,6 @@ export const useSelect = <Datum>({
       event.preventDefault()
       void selectItem(data[highlightedIndex])
     } else if (event.key === "ArrowUp") {
-      console.log("up!")
       event.preventDefault()
       if (highlightedIndex === 0) return
       else if (isHidden) setHighlightedIndex(data.length - 1)
