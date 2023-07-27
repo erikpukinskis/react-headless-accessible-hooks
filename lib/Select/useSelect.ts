@@ -7,6 +7,7 @@ type SelectOptions<Datum> = {
   getOptionValue: (item: Datum) => string
   onSelect?: (item: Datum) => void
   minQueryLength?: number
+  closeOnBlur?: boolean
 }
 
 export const useSelect = <Datum>({
@@ -14,6 +15,7 @@ export const useSelect = <Datum>({
   label,
   getOptionValue,
   onSelect,
+  closeOnBlur = true,
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
@@ -114,6 +116,7 @@ export const useSelect = <Datum>({
       },
       "onBlur": () => {
         inputIsFocusedRef.current = false
+        if (!closeOnBlur) return
         setHidden(true)
       },
       "aria-activedescendant": activeDescendantId,

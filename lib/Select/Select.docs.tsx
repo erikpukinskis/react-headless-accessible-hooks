@@ -40,6 +40,7 @@ const SelectItem = styled("div", {
 
 type TemplateProps = {
   minQueryLength: number
+  closeOnBlur?: boolean
 }
 
 // Items can be any type. You just need to provide a getOptionId function
@@ -51,7 +52,7 @@ const ITEMS = [
   { id: "four", label: "Fourth Item" },
 ]
 
-function Template({ minQueryLength }: TemplateProps) {
+function Template({ minQueryLength, closeOnBlur }: TemplateProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>()
 
   const [query, setQuery] = useState("")
@@ -79,6 +80,7 @@ function Template({ minQueryLength }: TemplateProps) {
     label: "Items",
     getOptionValue: (item) => item.id,
     onSelect: (item) => setSelectedId(item.id),
+    closeOnBlur,
   })
 
   return (
@@ -116,4 +118,8 @@ export const BasicSelect = (
 
 export const OpenOnFocus = (
   <Demo render={Template} props={{ minQueryLength: 0 }} />
+)
+
+export const Blurable = (
+  <Demo render={Template} props={{ minQueryLength: 0, closeOnBlur: false }} />
 )
