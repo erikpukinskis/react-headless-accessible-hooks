@@ -9,6 +9,7 @@ Necessary for an V1 release:
 - [ ] Keyboard control
 - [ ] Accessibility announce & roles
 - [ ] Don't pause dragging while waiting for a fresh tree
+- [ ] Figure out aria-activedescendant focus issue
 
 Maybes:
 

@@ -50,17 +50,17 @@ export const useSelect = <Datum>({
     setHighlightedIndex(0)
   }, [valuesHash])
 
-  const activeDescendantId = useMemo(
-    function updateActiveDescendant() {
-      if (highlightedIndex === -1) return undefined
-      if (!data) return undefined
-      if (data.length < 1) return undefined
-      const item = data[highlightedIndex]
-      if (!item) return undefined
-      return getOptionValue(item)
-    },
-    [highlightedIndex, data, getOptionValue]
-  )
+  // const activeDescendantId = useMemo(
+  //   function updateActiveDescendant() {
+  //     if (highlightedIndex === -1) return undefined
+  //     if (!data) return undefined
+  //     if (data.length < 1) return undefined
+  //     const item = data[highlightedIndex]
+  //     if (!item) return undefined
+  //     return getOptionValue(item)
+  //   },
+  //   [highlightedIndex, data, getOptionValue]
+  // )
 
   const selectItem = async (item: Datum) => {
     const hide = await onSelect?.(item)
@@ -132,7 +132,8 @@ export const useSelect = <Datum>({
       "onBlur": () => {
         focus(false)
       },
-      "aria-activedescendant": activeDescendantId,
+      // This is making focus get stuck on the input on load sometimes (with an Evergreen TagInput anyway)
+      // "aria-activedescendant": activeDescendantId,
       "onKeyDownCapture": handleKeys,
     }),
     getListboxProps: () => ({
