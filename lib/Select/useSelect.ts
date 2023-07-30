@@ -8,6 +8,7 @@ type SelectOptions<Datum> = {
   onSelect?: (
     item: Datum
   ) => boolean | void | undefined | Promise<boolean | void | undefined>
+  onBlur?(): void
   minQueryLength?: number
 }
 
@@ -16,6 +17,7 @@ export const useSelect = <Datum>({
   label,
   getOptionValue,
   onSelect,
+  onBlur,
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
@@ -39,8 +41,9 @@ export const useSelect = <Datum>({
       if (focusedElementCountRef.current) return
       if (didMouseDownOnOptionRef.current) return
       setHidden(true)
+      onBlur?.()
     })
-  }, [focusedElementCount])
+  }, [focusedElementCount, onBlur])
 
   const valuesHash = useMemo(() => {
     return data?.map(getOptionValue).join("-----")
@@ -71,6 +74,7 @@ export const useSelect = <Datum>({
   const handleKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
       setHidden(true)
+      onBlur?.()
       return
     }
 
