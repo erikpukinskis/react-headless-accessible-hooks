@@ -8,6 +8,7 @@ type SelectOptions<Datum> = {
   onSelect?: (
     item: Datum
   ) => boolean | void | undefined | Promise<boolean | void | undefined>
+  onBlur?(): void
   minQueryLength?: number
 }
 
@@ -16,6 +17,7 @@ export const useSelect = <Datum>({
   label,
   getOptionValue,
   onSelect,
+  onBlur,
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
@@ -39,8 +41,9 @@ export const useSelect = <Datum>({
       if (focusedElementCountRef.current) return
       if (didMouseDownOnOptionRef.current) return
       setHidden(true)
+      onBlur?.()
     })
-  }, [focusedElementCount])
+  }, [focusedElementCount, onBlur])
 
   const valuesHash = useMemo(() => {
     return data?.map(getOptionValue).join("-----")
@@ -50,17 +53,17 @@ export const useSelect = <Datum>({
     setHighlightedIndex(0)
   }, [valuesHash])
 
-  const activeDescendantId = useMemo(
-    function updateActiveDescendant() {
-      if (highlightedIndex === -1) return undefined
-      if (!data) return undefined
-      if (data.length < 1) return undefined
-      const item = data[highlightedIndex]
-      if (!item) return undefined
-      return getOptionValue(item)
-    },
-    [highlightedIndex, data, getOptionValue]
-  )
+  // const activeDescendantId = useMemo(
+  //   function updateActiveDescendant() {
+  //     if (highlightedIndex === -1) return undefined
+  //     if (!data) return undefined
+  //     if (data.length < 1) return undefined
+  //     const item = data[highlightedIndex]
+  //     if (!item) return undefined
+  //     return getOptionValue(item)
+  //   },
+  //   [highlightedIndex, data, getOptionValue]
+  // )
 
   const selectItem = async (item: Datum) => {
     const hide = await onSelect?.(item)
@@ -71,6 +74,7 @@ export const useSelect = <Datum>({
   const handleKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
       setHidden(true)
+      onBlur?.()
       return
     }
 
@@ -132,7 +136,8 @@ export const useSelect = <Datum>({
       "onBlur": () => {
         focus(false)
       },
-      "aria-activedescendant": activeDescendantId,
+      // This is making focus get stuck on the input on load sometimes (with an Evergreen TagInput anyway)
+      // "aria-activedescendant": activeDescendantId,
       "onKeyDownCapture": handleKeys,
     }),
     getListboxProps: () => ({
