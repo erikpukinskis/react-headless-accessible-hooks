@@ -1,5 +1,5 @@
 export { useOrderedTree, useOrderedTreeNode } from "./OrderedTree"
-export { useSelect } from "./Select/useSelect"
+export { useSelect, type SelectInputProps } from "./Select/useSelect"
 export {
   useAutocomplete,
   isAddOption,

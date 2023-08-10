@@ -12,6 +12,19 @@ type SelectOptions<Datum> = {
   minQueryLength?: number
 }
 
+export type SelectInputProps = {
+  role: string
+  "aria-expanded": boolean
+  onFocus: () => void
+  onBlur: () => void
+  onKeyDownCapture: (event: {
+    key: string
+    metaKey: boolean
+    preventDefault(): void
+    stopPropagation(): void
+  }) => void
+}
+
 export const useSelect = <Datum>({
   data,
   label,
@@ -71,7 +84,7 @@ export const useSelect = <Datum>({
     setHidden(true)
   }
 
-  const handleKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeys: SelectInputProps["onKeyDownCapture"] = (event) => {
     if (event.key === "Escape") {
       setHidden(true)
       onBlur?.()
@@ -126,7 +139,7 @@ export const useSelect = <Datum>({
   return {
     isExpanded: isExpanded(data),
     isHighlighted,
-    getInputProps: () => ({
+    getInputProps: (): SelectInputProps => ({
       "role": "combobox",
       "aria-expanded": isExpanded(data),
       "onFocus": () => {
