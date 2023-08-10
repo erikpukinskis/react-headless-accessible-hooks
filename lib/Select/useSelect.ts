@@ -97,24 +97,29 @@ export const useSelect = <Datum>({
       event.key === "PageUp" ||
       (event.key === "ArrowLeft" && event.metaKey)
     ) {
-      setHighlightedIndex(0)
       event.preventDefault()
+      event.stopPropagation()
+      setHighlightedIndex(0)
     } else if (
       event.key === "PageDown" ||
       (event.key === "ArrowRight" && event.metaKey)
     ) {
-      setHighlightedIndex(data.length - 1)
       event.preventDefault()
+      event.stopPropagation()
+      setHighlightedIndex(data.length - 1)
     } else if (event.key === "Enter") {
       event.preventDefault()
+      event.stopPropagation()
       void selectItem(data[highlightedIndex])
     } else if (event.key === "ArrowUp") {
       event.preventDefault()
+      event.stopPropagation()
       if (highlightedIndex === 0) return
       else if (isHidden) setHighlightedIndex(data.length - 1)
       else setHighlightedIndex((index) => index - 1)
     } else if (event.key === "ArrowDown") {
       event.preventDefault()
+      event.stopPropagation()
       if (highlightedIndex >= data.length - 1) return
       else if (isHidden) setHighlightedIndex(0)
       else setHighlightedIndex((index) => index + 1)
