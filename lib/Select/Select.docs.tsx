@@ -121,70 +121,74 @@ export const OpenOnFocus = (
 )
 
 export const Blurable = (
-  <Demo
-    render={() => {
-      const [query, setQuery] = useState("")
-      const [selected, setSelected] = useState("")
-      const [previewed, setPreviewed] = useState("")
-
-      const data = [
-        "Lithium-burning",
-        "Carbon-burning",
-        "Neon-burning",
-        "Oxygen-burning",
-      ]
-
-      const {
-        getInputProps,
-        getListboxProps,
-        getOptionProps,
-        isHighlighted,
-        isExpanded,
-      } = useSelect({
-        data,
-        label: "Items",
-        getOptionValue: (item) => item,
-        onSelect: (value) => {
-          setSelected(value)
-        },
-      })
-
-      const handleStarClick =
-        (starType: string) => (event: React.MouseEvent) => {
-          event.stopPropagation()
-          setPreviewed(starType)
-        }
-
-      return (
-        <div>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search items"
-            {...getInputProps()}
-          />
-          <br />
-          Selected: {selected ?? "none"}
-          <br />
-          Previewed: {previewed ?? "none"}
-          {isExpanded && (
-            <div {...getListboxProps()}>
-              {data.map((starType) => (
-                <SelectItem
-                  key={starType}
-                  {...getOptionProps(starType)}
-                  highlighted={isHighlighted(starType)}
-                >
-                  {starType}{" "}
-                  <button onClick={handleStarClick(starType)}>preview</button>
-                </SelectItem>
-              ))}
-            </div>
-          )}
-        </div>
-      )
-    }}
-  />
+  <Demo render={BlurableDemoComponent} props={{ closeOnSelect: true }} />
 )
+
+export const BlurableAndStaysOpen = (
+  <Demo render={BlurableDemoComponent} props={{ closeOnSelect: false }} />
+)
+
+function BlurableDemoComponent({ closeOnSelect }: { closeOnSelect: boolean }) {
+  const [query, setQuery] = useState("")
+  const [selected, setSelected] = useState("")
+  const [previewed, setPreviewed] = useState("")
+
+  const data = [
+    "Lithium-burning",
+    "Carbon-burning",
+    "Neon-burning",
+    "Oxygen-burning",
+  ]
+
+  const {
+    getInputProps,
+    getListboxProps,
+    getOptionProps,
+    isHighlighted,
+    isExpanded,
+  } = useSelect({
+    data,
+    label: "Items",
+    getOptionValue: (item) => item,
+    onSelect: (value) => {
+      setSelected(value)
+      return closeOnSelect
+    },
+  })
+
+  const handleStarClick = (starType: string) => (event: React.MouseEvent) => {
+    event.stopPropagation()
+    setPreviewed(starType)
+  }
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Search..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-label="Search items"
+        {...getInputProps()}
+      />
+      <br />
+      Selected: {selected ?? "none"}
+      <br />
+      Previewed: {previewed ?? "none"}
+      {isExpanded && (
+        <div {...getListboxProps()}>
+          {data.map((starType) => (
+            <SelectItem
+              key={starType}
+              {...getOptionProps(starType)}
+              highlighted={isHighlighted(starType)}
+            >
+              {starType}{" "}
+              <button onClick={handleStarClick(starType)}>preview</button>
+            </SelectItem>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -23,6 +23,8 @@ export type SelectInputProps = {
     preventDefault(): void
     stopPropagation(): void
   }) => void
+  onMouseDown: () => void
+  ref: React.Ref<HTMLInputElement>
 }
 
 export const useSelect = <Datum>({
@@ -37,10 +39,12 @@ export const useSelect = <Datum>({
   const didMouseDownOnOptionRef = useRef(false)
   const [focusedElementCount, setFocusedElementCount] = useState(0)
   const focusedElementCountRef = useRef<number | undefined>()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const mouseDownItemRef = useRef<Datum | undefined>()
 
-  const focus = (addingFocus: boolean) => {
+  const updateFocusedElementCount = (increment: 1 | -1) => {
     const oldCount = focusedElementCountRef.current ?? 0
-    const newCount = addingFocus ? oldCount + 1 : oldCount - 1
+    const newCount = oldCount + increment
 
     focusedElementCountRef.current = newCount
 
@@ -128,7 +132,8 @@ export const useSelect = <Datum>({
     setHidden(false)
   }
 
-  const handleOptionClick = (item: Datum) => {
+  const handleOptionClick = (event: React.MouseEvent, item: Datum) => {
+    event.preventDefault()
     didMouseDownOnOptionRef.current = false
     void selectItem(item)
   }
@@ -145,14 +150,20 @@ export const useSelect = <Datum>({
     isExpanded: isExpanded(data),
     isHighlighted,
     getInputProps: (): SelectInputProps => ({
+      ref: inputRef,
       "role": "combobox",
       "aria-expanded": isExpanded(data),
+      "onMouseDown": () => {
+        if (isHidden) {
+          setHidden(false)
+        }
+      },
       "onFocus": () => {
-        focus(true)
+        updateFocusedElementCount(1)
         setHidden(false)
       },
       "onBlur": () => {
-        focus(false)
+        updateFocusedElementCount(-1)
       },
       // This is making focus get stuck on the input on load sometimes (with an Evergreen TagInput anyway)
       // "aria-activedescendant": activeDescendantId,
@@ -162,16 +173,18 @@ export const useSelect = <Datum>({
       "role": "listbox",
       "aria-label": label,
       onFocus: () => {
-        focus(true)
+        updateFocusedElementCount(1)
       },
       onBlur: () => {
-        focus(false)
+        updateFocusedElementCount(-1)
       },
     }),
     getOptionProps: (item: Datum) => ({
       "role": "option",
-      "onClick": handleOptionClick.bind(null, item),
-      "onMouseDown": () => {
+      "onClick": (event: React.MouseEvent) => handleOptionClick(event, item),
+      "onMouseDown": (event: React.MouseEvent) => {
+        event.preventDefault()
+        mouseDownItemRef.current = item
         didMouseDownOnOptionRef.current = true
       },
       "onMouseUp": () => {
