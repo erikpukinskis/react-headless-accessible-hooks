@@ -83,9 +83,8 @@ export const useSelect = <Datum>({
   // )
 
   const selectItem = async (item: Datum) => {
-    const hide = await onSelect?.(item)
-    if (hide === false) return
-    setHidden(true)
+    const hide = (await onSelect?.(item)) ?? true
+    if (hide) setHidden(true)
   }
 
   const handleKeys: SelectInputProps["onKeyDownCapture"] = (event) => {
