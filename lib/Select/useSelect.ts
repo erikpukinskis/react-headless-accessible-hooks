@@ -24,7 +24,6 @@ export type SelectInputProps = {
     stopPropagation(): void
   }) => void
   onMouseDown: () => void
-  ref: React.Ref<HTMLInputElement>
 }
 
 export const useSelect = <Datum>({
@@ -39,7 +38,6 @@ export const useSelect = <Datum>({
   const didMouseDownOnOptionRef = useRef(false)
   const [focusedElementCount, setFocusedElementCount] = useState(0)
   const focusedElementCountRef = useRef<number | undefined>()
-  const inputRef = useRef<HTMLInputElement>(null)
   const mouseDownItemRef = useRef<Datum | undefined>()
 
   const updateFocusedElementCount = (increment: 1 | -1) => {
@@ -149,7 +147,6 @@ export const useSelect = <Datum>({
     isExpanded: isExpanded(data),
     isHighlighted,
     getInputProps: (): SelectInputProps => ({
-      ref: inputRef,
       "role": "combobox",
       "aria-expanded": isExpanded(data),
       "onMouseDown": () => {
