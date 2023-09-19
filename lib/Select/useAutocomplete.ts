@@ -66,12 +66,12 @@ export function isAddOption(option: unknown | AddOption): option is AddOption {
 
 type UseAutocompleteReturnType<Datum> = {
   query: string
-  setQuery(newQuery: string): void
+  setQuery(this: void, newQuery: string): void
   matches: Datum[]
 }
 
 type UseAutocompleteReturnTypeWithAddOption<Datum> = {
   query: string
-  setQuery(newQuery: string): void
+  setQuery(this: void, newQuery: string): void
   matches: (Datum | AddOption)[]
 }
