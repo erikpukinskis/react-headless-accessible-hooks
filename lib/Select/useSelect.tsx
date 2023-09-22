@@ -26,7 +26,7 @@ export type SelectInputProps = {
   onMouseDown: () => void
 }
 
-export const useSelect = <Datum>({
+export const useSelect = <Datum,>({
   data,
   label,
   getOptionValue,
@@ -35,10 +35,8 @@ export const useSelect = <Datum>({
 }: SelectOptions<Datum>) => {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
-  const didMouseDownOnOptionRef = useRef(false)
   const [focusedElementCount, setFocusedElementCount] = useState(0)
   const focusedElementCountRef = useRef<number | undefined>()
-  const mouseDownItemRef = useRef<Datum | undefined>()
 
   const updateFocusedElementCount = (increment: 1 | -1) => {
     const oldCount = focusedElementCountRef.current ?? 0
@@ -53,8 +51,12 @@ export const useSelect = <Datum>({
     if (focusedElementCountRef.current === undefined) return
 
     setTimeout(() => {
+      // I think here we're saying, if we blur the input we wait to see if we
+      // focused one of the options. But I'm not sure this is even necessary
+      // anymore? Well, it probably is because otherwise how else would we
+      // detect a click-away blur. But I do think all of this focus counting has
+      // proven brittle and a document listener might be better.
       if (focusedElementCountRef.current) return
-      if (didMouseDownOnOptionRef.current) return
       setHidden(true)
       onBlur?.()
     })
@@ -131,7 +133,6 @@ export const useSelect = <Datum>({
 
   const handleOptionClick = (event: React.MouseEvent, item: Datum) => {
     event.preventDefault()
-    didMouseDownOnOptionRef.current = false
     void selectItem(item)
   }
 
@@ -177,17 +178,17 @@ export const useSelect = <Datum>({
     }),
     getOptionProps: (item: Datum) => ({
       "role": "option",
-      "onClick": (event: React.MouseEvent) => handleOptionClick(event, item),
+      "onClick": (event: React.MouseEvent) => {
+        // event.preventDefault()
+        handleOptionClick(event, item)
+      },
       "onMouseDown": (event: React.MouseEvent) => {
-        event.preventDefault()
-        mouseDownItemRef.current = item
-        didMouseDownOnOptionRef.current = true
+        // If we're just clicking an option, we don't want to lose focus, so we want to interfere with the click
+        if ((event.target as HTMLElement).tabIndex === -1) {
+          event.preventDefault()
+        }
       },
-      "onMouseUp": () => {
-        setTimeout(() => {
-          didMouseDownOnOptionRef.current = false
-        })
-      },
+
       "onMouseOver": () => {
         if (!data) {
           throw new Error("Moused over an option but there was no select data")
@@ -198,4 +199,10 @@ export const useSelect = <Datum>({
       "id": data ? getOptionValue(item) : undefined,
     }),
   }
+}
+
+type OptionControlProps = Pick<React.HTMLAttributes<HTMLDivElement>, "children">
+
+export const OptionControl = (props: OptionControlProps) => {
+  return <span {...props} onClick={(event) => event?.stopPropagation()} />
 }

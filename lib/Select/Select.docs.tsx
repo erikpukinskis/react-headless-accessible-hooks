@@ -2,7 +2,7 @@ import { styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
 import { kebabCase } from "lodash"
 import React, { useMemo, useState } from "react"
-import { useSelect } from "./useSelect"
+import { OptionControl, useSelect } from "./useSelect"
 
 export default (
   <Doc path="/Docs/Select">
@@ -120,25 +120,25 @@ export const OpenOnFocus = (
   <Demo render={Template} props={{ minQueryLength: 0 }} />
 )
 
-export const Blurable = (
+export const BlurableInput = (
   <Demo render={BlurableDemoComponent} props={{ closeOnSelect: true }} />
 )
 
-export const BlurableAndStaysOpen = (
+export const BlurableInputAndMenuStaysOpen = (
   <Demo render={BlurableDemoComponent} props={{ closeOnSelect: false }} />
 )
 
 function BlurableDemoComponent({ closeOnSelect }: { closeOnSelect: boolean }) {
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState("")
-  const [previewed, setPreviewed] = useState("")
+  const [editing, setEditing] = useState(-1)
 
-  const data = [
+  const [data, setData] = useState([
     "Lithium-burning",
     "Carbon-burning",
     "Neon-burning",
     "Oxygen-burning",
-  ]
+  ])
 
   const {
     getInputProps,
@@ -156,9 +156,18 @@ function BlurableDemoComponent({ closeOnSelect }: { closeOnSelect: boolean }) {
     },
   })
 
-  const handleStarClick = (starType: string) => (event: React.MouseEvent) => {
-    event.stopPropagation()
-    setPreviewed(starType)
+  const toggleEditing = (index: number) => () => {
+    if (editing === index) {
+      setEditing(-1)
+    } else {
+      setEditing(index)
+    }
+  }
+
+  const updateStarType = (index: number) => (event: React.ChangeEvent) => {
+    const newData = [...data]
+    newData[index] = (event.target as HTMLInputElement).value
+    setData(newData)
   }
 
   return (
@@ -173,18 +182,28 @@ function BlurableDemoComponent({ closeOnSelect }: { closeOnSelect: boolean }) {
       />
       <br />
       Selected: {selected ?? "none"}
-      <br />
-      Previewed: {previewed ?? "none"}
       {isExpanded && (
         <div {...getListboxProps()}>
-          {data.map((starType) => (
+          {data.map((starType, index) => (
             <SelectItem
-              key={starType}
+              key={index}
               {...getOptionProps(starType)}
               highlighted={isHighlighted(starType)}
             >
-              {starType}{" "}
-              <button onClick={handleStarClick(starType)}>preview</button>
+              {editing === index ? (
+                <OptionControl>
+                  <input
+                    type="text"
+                    value={starType}
+                    onChange={updateStarType(index)}
+                  />
+                </OptionControl>
+              ) : (
+                starType
+              )}{" "}
+              <OptionControl>
+                <button onClick={toggleEditing(index)}>edit</button>
+              </OptionControl>
             </SelectItem>
           ))}
         </div>

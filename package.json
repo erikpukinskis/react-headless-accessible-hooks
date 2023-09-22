@@ -39,7 +39,7 @@
     "@typescript-eslint/eslint-plugin": "5.46.0",
     "@typescript-eslint/parser": "^5.42.0",
     "@vitejs/plugin-react": "^4.0.0",
-    "codedocs": "0.18.0",
+    "codedocs": "file:.yalc/codedocs",
     "eslint": "8.29.0",
     "eslint-import-resolver-typescript": "^3.5.2",
     "eslint-plugin-import": "^2.26.0",
