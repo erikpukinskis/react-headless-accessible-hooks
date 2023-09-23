@@ -79,9 +79,10 @@ function Template({ minQueryLength, closeOnSelect = true }: TemplateProps) {
     data: matchingItems,
     label: "Items",
     getOptionValue: (item) => item.id,
-    onSelect: (item) => {
+    onSelect: (item, { close }) => {
       setSelectedId(item.id)
-      return !closeOnSelect
+
+      if (closeOnSelect) close()
     },
   })
 
@@ -123,7 +124,7 @@ export const OpenOnFocus = (
 )
 
 export const StaysOpenOnSelect = (
-  <Demo render={Template} props={{ minQueryLength: 0, closeOnSelect: true }} />
+  <Demo render={Template} props={{ minQueryLength: 0, closeOnSelect: false }} />
 )
 
 export const BlurableInput = (
@@ -156,9 +157,10 @@ function BlurableDemoComponent({ closeOnSelect }: { closeOnSelect: boolean }) {
     data,
     label: "Items",
     getOptionValue: (item) => item,
-    onSelect: (value) => {
+    onSelect: (value, { close }) => {
       setSelected(value)
-      return closeOnSelect
+
+      if (closeOnSelect) close()
     },
   })
 
