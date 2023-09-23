@@ -1,66 +1,45 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 
-type SelectOptions<Datum> = {
-  data?: Datum[]
+type SelectOptions<DataType> = {
+  data?: DataType[]
   label: string
   onInputChange?: (value: string) => void
-  getOptionValue: (item: Datum) => string
+  getOptionValue: (item: DataType) => string
   onSelect?: (
-    item: Datum
+    item: DataType
   ) => boolean | void | undefined | Promise<boolean | void | undefined>
   onBlur?(): void
   minQueryLength?: number
 }
 
-export type SelectInputProps = {
+export type SelectInputProps<InputElementType extends HTMLElement> = {
   role: string
   "aria-expanded": boolean
-  onFocus: () => void
-  onBlur: () => void
   onKeyDownCapture: (event: {
     key: string
     metaKey: boolean
     preventDefault(): void
     stopPropagation(): void
   }) => void
+  ref: React.RefObject<InputElementType>
   onMouseDown: () => void
 }
 
-export const useSelect = <Datum,>({
-  data,
-  label,
-  getOptionValue,
-  onSelect,
-  onBlur,
-}: SelectOptions<Datum>) => {
+export type SelectListboxProps<ListboxElementType extends HTMLElement> = {
+  role: string
+  "aria-label": string
+  ref: React.RefObject<ListboxElementType>
+}
+
+export function useSelect<
+  DataType,
+  InputElementType extends HTMLElement = HTMLInputElement,
+  ListboxElementType extends HTMLElement = HTMLDivElement
+>({ data, label, getOptionValue, onSelect, onBlur }: SelectOptions<DataType>) {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
-  const [focusedElementCount, setFocusedElementCount] = useState(0)
-  const focusedElementCountRef = useRef<number | undefined>()
-
-  const updateFocusedElementCount = (increment: 1 | -1) => {
-    const oldCount = focusedElementCountRef.current ?? 0
-    const newCount = oldCount + increment
-
-    focusedElementCountRef.current = newCount
-
-    setFocusedElementCount(newCount)
-  }
-
-  useEffect(() => {
-    if (focusedElementCountRef.current === undefined) return
-
-    setTimeout(() => {
-      // I think here we're saying, if we blur the input we wait to see if we
-      // focused one of the options. But I'm not sure this is even necessary
-      // anymore? Well, it probably is because otherwise how else would we
-      // detect a click-away blur. But I do think all of this focus counting has
-      // proven brittle and a document listener might be better.
-      if (focusedElementCountRef.current) return
-      setHidden(true)
-      onBlur?.()
-    })
-  }, [focusedElementCount, onBlur])
+  const inputRef = useRef<InputElementType>(null)
+  const listboxRef = useRef<ListboxElementType>(null)
 
   const valuesHash = useMemo(() => {
     return data?.map(getOptionValue).join("-----")
@@ -69,6 +48,29 @@ export const useSelect = <Datum,>({
   useEffect(() => {
     setHighlightedIndex(0)
   }, [valuesHash])
+
+  useEffect(() => {
+    if (isHidden) return
+
+    const handleBackdropClick = (event: MouseEvent) => {
+      if (
+        elementIsDescendantOf(
+          event.target,
+          inputRef.current,
+          listboxRef.current
+        )
+      )
+        return
+
+      setHidden(true)
+    }
+
+    document.addEventListener("click", handleBackdropClick)
+
+    return () => {
+      document.removeEventListener("click", handleBackdropClick)
+    }
+  }, [isHidden])
 
   // const activeDescendantId = useMemo(
   //   function updateActiveDescendant() {
@@ -82,12 +84,14 @@ export const useSelect = <Datum,>({
   //   [highlightedIndex, data, getOptionValue]
   // )
 
-  const selectItem = async (item: Datum) => {
+  const selectItem = async (item: DataType) => {
     const hide = (await onSelect?.(item)) ?? true
     if (hide) setHidden(true)
   }
 
-  const handleKeys: SelectInputProps["onKeyDownCapture"] = (event) => {
+  const handleKeys: SelectInputProps<InputElementType>["onKeyDownCapture"] = (
+    event
+  ) => {
     if (event.key === "Escape") {
       setHidden(true)
       onBlur?.()
@@ -131,23 +135,23 @@ export const useSelect = <Datum,>({
     setHidden(false)
   }
 
-  const handleOptionClick = (event: React.MouseEvent, item: Datum) => {
+  const handleOptionClick = (event: React.MouseEvent, item: DataType) => {
     event.preventDefault()
     void selectItem(item)
   }
 
-  const isExpanded = (items: Datum[] | undefined): items is Datum[] => {
+  const isExpanded = (items: DataType[] | undefined): items is DataType[] => {
     return Boolean(items) && !isHidden
   }
 
-  const isHighlighted = (item: Datum) => {
+  const isHighlighted = (item: DataType) => {
     return item === data?.[highlightedIndex]
   }
 
   return {
     isExpanded: isExpanded(data),
     isHighlighted,
-    getInputProps: (): SelectInputProps => ({
+    getInputProps: (): SelectInputProps<InputElementType> => ({
       "role": "combobox",
       "aria-expanded": isExpanded(data),
       "onMouseDown": () => {
@@ -155,28 +159,17 @@ export const useSelect = <Datum,>({
           setHidden(false)
         }
       },
-      "onFocus": () => {
-        updateFocusedElementCount(1)
-        setHidden(false)
-      },
-      "onBlur": () => {
-        updateFocusedElementCount(-1)
-      },
       // This is making focus get stuck on the input on load sometimes (with an Evergreen TagInput anyway)
       // "aria-activedescendant": activeDescendantId,
       "onKeyDownCapture": handleKeys,
+      ref: inputRef,
     }),
-    getListboxProps: () => ({
+    getListboxProps: (): SelectListboxProps<ListboxElementType> => ({
       "role": "listbox",
       "aria-label": label,
-      onFocus: () => {
-        updateFocusedElementCount(1)
-      },
-      onBlur: () => {
-        updateFocusedElementCount(-1)
-      },
+      ref: listboxRef,
     }),
-    getOptionProps: (item: Datum) => ({
+    getOptionProps: (item: DataType) => ({
       "role": "option",
       "onClick": (event: React.MouseEvent) => {
         // event.preventDefault()
@@ -201,8 +194,14 @@ export const useSelect = <Datum,>({
   }
 }
 
-type OptionControlProps = Pick<React.HTMLAttributes<HTMLDivElement>, "children">
+function elementIsDescendantOf(
+  target: EventTarget | null,
+  ...elements: (HTMLElement | null)[]
+) {
+  for (const possibleParent of elements) {
+    if (!possibleParent) continue
+    if (possibleParent.contains(target as HTMLElement)) return true
+  }
 
-export const OptionControl = (props: OptionControlProps) => {
-  return <span {...props} onClick={(event) => event?.stopPropagation()} />
+  return false
 }

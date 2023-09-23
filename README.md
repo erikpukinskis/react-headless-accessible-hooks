@@ -4,6 +4,10 @@ Hooks to power complex interactive components, leaving the DOM and styles to you
 
 Necessary for an V1 release:
 
+**Select**
+
+- [ ] Make close() a callback instead of a return value
+
 **OrderedTree**
 
 - [ ] Keyboard control
