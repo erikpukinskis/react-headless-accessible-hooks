@@ -2,7 +2,7 @@ import { styled } from "@stitches/react"
 import { Doc, Demo } from "codedocs"
 import { kebabCase } from "lodash"
 import React, { useMemo, useState } from "react"
-import { OptionControl, useSelect } from "./useSelect"
+import { useSelect } from "./useSelect"
 
 export default (
   <Doc path="/Docs/Select">
@@ -40,6 +40,7 @@ const SelectItem = styled("div", {
 
 type TemplateProps = {
   minQueryLength: number
+  closeOnSelect?: boolean
 }
 
 // Items can be any type. You just need to provide a getOptionId function
@@ -51,7 +52,7 @@ const ITEMS = [
   { id: "four", label: "Fourth Item" },
 ]
 
-function Template({ minQueryLength }: TemplateProps) {
+function Template({ minQueryLength, closeOnSelect = true }: TemplateProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>()
 
   const [query, setQuery] = useState("")
@@ -80,6 +81,7 @@ function Template({ minQueryLength }: TemplateProps) {
     getOptionValue: (item) => item.id,
     onSelect: (item) => {
       setSelectedId(item.id)
+      return !closeOnSelect
     },
   })
 
@@ -118,6 +120,10 @@ export const BasicSelect = (
 
 export const OpenOnFocus = (
   <Demo render={Template} props={{ minQueryLength: 0 }} />
+)
+
+export const StaysOpenOnSelect = (
+  <Demo render={Template} props={{ minQueryLength: 0, closeOnSelect: true }} />
 )
 
 export const BlurableInput = (
@@ -191,19 +197,15 @@ function BlurableDemoComponent({ closeOnSelect }: { closeOnSelect: boolean }) {
               highlighted={isHighlighted(starType)}
             >
               {editing === index ? (
-                <OptionControl>
-                  <input
-                    type="text"
-                    value={starType}
-                    onChange={updateStarType(index)}
-                  />
-                </OptionControl>
+                <input
+                  type="text"
+                  value={starType}
+                  onChange={updateStarType(index)}
+                />
               ) : (
                 starType
               )}{" "}
-              <OptionControl>
-                <button onClick={toggleEditing(index)}>edit</button>
-              </OptionControl>
+              <button onClick={toggleEditing(index)}>edit</button>
             </SelectItem>
           ))}
         </div>
