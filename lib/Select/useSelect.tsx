@@ -6,8 +6,11 @@ type SelectOptions<DataType> = {
   onInputChange?: (value: string) => void
   getOptionValue: (item: DataType) => string
   onSelect?: (
-    item: DataType
-  ) => boolean | void | undefined | Promise<boolean | void | undefined>
+    item: DataType,
+    options: {
+      close: () => void
+    }
+  ) => void
   onBlur?(): void
   minQueryLength?: number
 }
@@ -84,9 +87,8 @@ export function useSelect<
   //   [highlightedIndex, data, getOptionValue]
   // )
 
-  const selectItem = async (item: DataType) => {
-    const hide = (await onSelect?.(item)) ?? true
-    if (hide) setHidden(true)
+  const selectItem = (item: DataType) => {
+    onSelect?.(item, { close: () => setHidden(true) })
   }
 
   const handleKeys: SelectInputProps<InputElementType>["onKeyDownCapture"] = (
