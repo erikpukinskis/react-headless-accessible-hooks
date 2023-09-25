@@ -123,6 +123,7 @@ export function useSelect<
       event.preventDefault()
       event.stopPropagation()
       void selectItem(data[highlightedIndex])
+      return
     } else if (event.key === "ArrowUp") {
       event.preventDefault()
       event.stopPropagation()
