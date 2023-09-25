@@ -60,14 +60,13 @@ export function useSelect<
     if (isHidden) return
 
     const handleBackdropClick = (event: MouseEvent) => {
-      if (
-        elementIsDescendantOf(
-          event.target,
-          inputRef.current,
-          listboxRef.current
-        )
+      const isDescendant = elementIsDescendantOf(
+        event.target,
+        inputRef.current,
+        listboxRef.current
       )
-        return
+
+      if (isDescendant) return
 
       setHidden(true)
     }
@@ -142,7 +141,7 @@ export function useSelect<
   }
 
   const handleOptionClick = (event: React.MouseEvent, item: DataType) => {
-    event.preventDefault()
+    event.preventDefault() // why do we need this?
     void selectItem(item)
   }
 
@@ -178,7 +177,9 @@ export function useSelect<
     getOptionProps: (item: DataType) => ({
       "role": "option",
       "onClick": (event: React.MouseEvent) => {
-        // event.preventDefault()
+        // If you're clicking something inside the option that does stuff, don't fire an option click event:
+        if (isInteractive(event.target)) return
+
         handleOptionClick(event, item)
       },
       "onMouseDown": (event: React.MouseEvent) => {
@@ -210,4 +211,24 @@ function elementIsDescendantOf(
   }
 
   return false
+}
+
+function isInteractive(target: EventTarget | null) {
+  if (!target) return false
+
+  let parent: HTMLElement | null = target as HTMLElement
+
+  let depth = 0
+  do {
+    depth++
+    if (parent.tabIndex >= 0) return true
+    parent = parent.parentElement
+    if (parent?.role === "listbox") return false
+  } while (parent && depth < 20)
+
+  if (depth >= 20) {
+    throw new Error(
+      "Searched 20 parents of an option without finding the listbox. That likely means an option was rendered outside of the listbox provided by useSelect which is not allowed."
+    )
+  }
 }
