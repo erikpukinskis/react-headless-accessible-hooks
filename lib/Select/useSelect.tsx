@@ -15,7 +15,9 @@ type SelectOptions<DataType> = {
   minQueryLength?: number
 }
 
-export type SelectInputProps<InputElementType extends HTMLElement> = {
+export type SelectInputProps<
+  InputElementType extends HTMLElement = HTMLInputElement
+> = {
   role: string
   "aria-expanded": boolean
   onKeyDownCapture: (event: {
@@ -28,7 +30,9 @@ export type SelectInputProps<InputElementType extends HTMLElement> = {
   onMouseDown: () => void
 }
 
-export type SelectListboxProps<ListboxElementType extends HTMLElement> = {
+export type SelectListboxProps<
+  ListboxElementType extends HTMLElement = HTMLDivElement
+> = {
   role: string
   "aria-label": string
   ref: React.RefObject<ListboxElementType>
