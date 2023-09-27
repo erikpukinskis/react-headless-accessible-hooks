@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 
 type SelectOptions<DataType> = {
+  debug?: boolean
   data?: DataType[]
   label: string
-  onInputChange?: (value: string) => void
   getOptionValue: (item: DataType) => string
   onSelect?: (
     item: DataType,
@@ -12,7 +12,6 @@ type SelectOptions<DataType> = {
     }
   ) => void
   onBlur?(): void
-  minQueryLength?: number
 }
 
 export type SelectInputProps<
@@ -42,11 +41,28 @@ export function useSelect<
   DataType,
   InputElementType extends HTMLElement = HTMLInputElement,
   ListboxElementType extends HTMLElement = HTMLDivElement
->({ data, label, getOptionValue, onSelect, onBlur }: SelectOptions<DataType>) {
+>({
+  data,
+  label,
+  getOptionValue,
+  onSelect,
+  onBlur,
+  debug = false,
+}: SelectOptions<DataType>) {
   const [isHidden, setHidden] = useState(true)
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
   const inputRef = useRef<InputElementType>(null)
   const listboxRef = useRef<ListboxElementType>(null)
+
+  const log = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (...data: any[]) => {
+      if (!debug) return
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      console.log("👌", ...data)
+    },
+    [debug]
+  )
 
   const valuesHash = useMemo(() => {
     return data?.map(getOptionValue).join("-----")
@@ -68,6 +84,14 @@ export function useSelect<
 
       if (isDescendant) return
 
+      log(
+        "hiding select (backdrop click)",
+        !listboxRef.current
+          ? "❌  no listbox element found! did you pass getListboxProps() to something that takes a ref?"
+          : !inputRef.current
+          ? "❌  no input element found! did you pass getInputProps() to something that takes a ref?"
+          : undefined
+      )
       setHidden(true)
     }
 
@@ -76,7 +100,7 @@ export function useSelect<
     return () => {
       document.removeEventListener("click", handleBackdropClick)
     }
-  }, [isHidden])
+  }, [isHidden, log])
 
   // const activeDescendantId = useMemo(
   //   function updateActiveDescendant() {
@@ -91,13 +115,19 @@ export function useSelect<
   // )
 
   const selectItem = (item: DataType) => {
-    onSelect?.(item, { close: () => setHidden(true) })
+    onSelect?.(item, {
+      close: () => {
+        log("hiding select (onSelect called close())")
+        setHidden(true)
+      },
+    })
   }
 
   const handleKeys: SelectInputProps<InputElementType>["onKeyDownCapture"] = (
     event
   ) => {
     if (event.key === "Escape") {
+      log("hiding select (pressed Escape)")
       setHidden(true)
       onBlur?.()
       return
@@ -138,7 +168,10 @@ export function useSelect<
       else setHighlightedIndex((index) => index + 1)
     }
 
-    setHidden(false)
+    if (isHidden) {
+      log("showing select (pressed a key other than Enter)")
+      setHidden(false)
+    }
   }
 
   const handleOptionClick = (event: React.MouseEvent, item: DataType) => {
@@ -162,6 +195,7 @@ export function useSelect<
       "aria-expanded": isExpanded(data),
       "onMouseDown": () => {
         if (isHidden) {
+          log("showing select (clicked inside input)")
           setHidden(false)
         }
       },
