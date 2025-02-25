@@ -9,12 +9,14 @@ import { buildKin } from "~/kin"
 
 export default (
   <Doc path="/Docs/OrderedTree">
-    <p>For a tree of items that can be dragged into a different order.</p>
+    <p>
+      A tree of items that can be dragged into a different order, re-homed under
+      different parents, expanded, and collapsed.
+    </p>
 
-    <p>Assumptions:</p>
+    <p>Notes:</p>
 
     <ul>
-      <li>Tree elements are all the same height</li>
       <li>Items cannot be dragged into a collapsed tree node</li>
     </ul>
   </Doc>
