@@ -1,5 +1,15 @@
 Hooks to power complex interactive components, leaving the DOM and styles to you.
 
+## Getting started
+
+Start the documentation site locally (great sandbox to use for development):
+
+```
+yarn start:docs:dev
+```
+
+Then open http://localhost:5173/Docs
+
 ## Todo
 
 ### Ordered Tree
