@@ -17,7 +17,7 @@ The hooks in react-headless-accessible-hooks adhere to a few design principles:
 
 2. We make **no presumptions about how your data is structured**. You don't need IDs of a certain type, you don't need to nest your data any particular way. You just provide functions which answer the questions we need to know:
 
-   ```
+   ```js
    useOrderedTree<Person>({
      getId: (person) => person.id,
      getParentId: (person) => parent.id,
