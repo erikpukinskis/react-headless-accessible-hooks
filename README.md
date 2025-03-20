@@ -30,7 +30,7 @@ The hooks in react-headless-accessible-hooks adhere to a few design principles:
 
    and the hook asks those questions as needed.
 
-<img alt="gif of nodes being dragged about" src="https://github.com/erikpukinskis/react-headless-accessible-hooks/raw/documentation/docs/ordered-tree.gif" width="480" />
+<img alt="gif of nodes being dragged about" src="https://raw.githubusercontent.com/erikpukinskis/react-headless-accessible-hooks/main/docs/ordered-tree.gif" width="480" />
 
 ## `useOrderedTree`
 
