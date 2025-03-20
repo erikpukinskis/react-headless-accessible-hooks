@@ -341,6 +341,19 @@ export class OrderedTreeModel<Datum> {
     const dy = this.clientY - this.dragStart.clientY
     const rowHeight = this.dragStart.treeBox.height / this.tree.treeSize
     const index = this.getIndex(this.dragStart.node.id)
+
+    /**
+     * TODO(erik): There are probably better ways of doing this. In an ideal
+     * world I think the nodes could be any height, and indeed uneven heights.
+     *
+     * One way to do that would be to track all of the node heights and add them
+     * up. However, that would potentially cause performance problems. And we'd
+     * probably have to deal with margins too. We gain a lot of performance (and
+     * simplicity) by assuming that the nodes are all equal heights.
+     *
+     * We might also be able to do something by tracking which node we are
+     * hovering over.
+     */
     const rowTop = index * rowHeight
 
     const left = `${dx.toFixed(1)}px`

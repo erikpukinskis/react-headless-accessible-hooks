@@ -49,10 +49,40 @@ function OrderedTreeProvider<Datum>({
 }
 
 export type UseOrderedTreeArgs<Datum> = DatumFunctions<Datum> & {
+  /**
+   * The nodes to be displayed in the tree
+   */
   data: Datum[]
+  /**
+   * Callback fired when a single node has been moved.
+   *
+   * @param id the ID of the node which moved
+   * @param newOrder the new order amongst its siblings (0 to 1)
+   * @param newParentId the parent node ID, or null if it was moved to the root
+   */
   onNodeMove(id: string, newOrder: number, newParentId: string | null): void
+  /**
+   * Callback fired when a node has been clicked
+   *
+   * @param datum the node which was clicked on
+   */
   onClick?(datum: Datum): void
+  /**
+   * Callback fired when an implicit ordering has been applied to items which
+   * don't have an explicit order yet. For example, on first load. This allows
+   * you to persist that ordering so any changes the user makes are relative to
+   * a permanent base order.
+   *
+   * @param ordersById A mapping of IDs to an order (rank) between 0 and 1
+   */
   onBulkNodeOrder(ordersById: Record<string, number>): void
+  /**
+   * Optional filter function which hides nodes based on some criteria
+   *
+   * @param datum a node
+   * @returns true or undefined if that node should be shown, false if it should
+   * be hidden
+   */
   isFilteredOut?(datum: Datum): boolean | undefined
   dump?: DebugDataDumper
 }
@@ -68,10 +98,41 @@ type GetNodeProps = () => {
 }
 
 type UseOrderedTreeReturnType<Datum> = {
+  /**
+   * The nodes in the tree with no parent. Typically these would be rendered at
+   * the top level of your tree renderer.
+   */
   roots: Datum[]
+  /**
+   * Nodes who have a parent, according to the `getParentId` function you
+   * passed, but no such parent was found in the data array. You may want to
+   * surface these to the user in some way for cleanup.
+   */
   orphans: Datum[]
+  /**
+   * @returns the props needed to put on the tree container DOM element.
+   *
+   * This includes tags needed for accessibility, and a ref which we use for
+   * keeping track of the height of the container. That height is divided by the
+   * number of visible nodes in order to get the node height which is used to
+   * figure out where you're dragging.
+   */
   getTreeProps: GetTreeProps
+  /**
+   * A React provider which allows you to use the `useOrderedTreeNode` hook
+   * deeper in your component hierarchy.
+   */
   TreeProvider(this: void, props: { children: React.ReactNode }): JSX.Element
+  /**
+   * Returns a unique key for any node you pass. You could use the node ID,
+   * however sometimes you may want to have a node and a placeholder version of
+   * that node being dragged both in the tree at the same time. So this function
+   * lets you get a unique key that will disambiguate the node from its
+   * placeholder.
+   *
+   * @param datum the node being rendered
+   * @returns a unqiue string
+   */
   getKey(this: void, datum: Datum): string
   isDropping: boolean
   isCollapsed(this: void, datum: Datum): boolean
@@ -341,6 +402,9 @@ type UseOrderedTreeNodeReturnType<Datum> = {
 }
 
 export function useOrderedTreeNode<Datum>(
+  /**
+   * The node we are rendering
+   */
   datum: Datum
 ): UseOrderedTreeNodeReturnType<Datum> {
   const model = useModel<Datum>()
