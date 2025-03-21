@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { render, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { kebabCase } from "lodash"
@@ -6,6 +7,10 @@ import { describe, it, expect, vi, afterEach } from "vitest"
 import { useSelect } from "./useSelect"
 
 const user = userEvent.setup()
+
+const expectCloseHandler = expect.objectContaining({
+  close: expect.any(Function),
+})
 
 describe("Select", () => {
   afterEach(cleanup)
@@ -24,11 +29,12 @@ describe("Select", () => {
     await user.keyboard("{ArrowDown}")
     await user.keyboard("{Enter}")
 
-    expect(onSelect).toHaveBeenCalledWith(ITEMS[3])
+    expect(onSelect).toHaveBeenCalledWith(ITEMS[3], expectCloseHandler)
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "four",
-      })
+      }),
+      expectCloseHandler
     )
   })
 

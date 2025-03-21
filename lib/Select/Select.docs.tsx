@@ -40,6 +40,7 @@ const SelectItem = styled("div", {
 
 type TemplateProps = {
   minQueryLength: number
+  closeOnSelect?: boolean
 }
 
 // Items can be any type. You just need to provide a getOptionId function
@@ -51,7 +52,7 @@ const ITEMS = [
   { id: "four", label: "Fourth Item" },
 ]
 
-function Template({ minQueryLength }: TemplateProps) {
+function Template({ minQueryLength, closeOnSelect = true }: TemplateProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>()
 
   const [query, setQuery] = useState("")
@@ -78,8 +79,10 @@ function Template({ minQueryLength }: TemplateProps) {
     data: matchingItems,
     label: "Items",
     getOptionValue: (item) => item.id,
-    onSelect: (item) => {
+    onSelect: (item, { close }) => {
       setSelectedId(item.id)
+
+      if (closeOnSelect) close()
     },
   })
 
@@ -120,71 +123,95 @@ export const OpenOnFocus = (
   <Demo render={Template} props={{ minQueryLength: 0 }} />
 )
 
-export const Blurable = (
-  <Demo
-    render={() => {
-      const [query, setQuery] = useState("")
-      const [selected, setSelected] = useState("")
-      const [previewed, setPreviewed] = useState("")
-
-      const data = [
-        "Lithium-burning",
-        "Carbon-burning",
-        "Neon-burning",
-        "Oxygen-burning",
-      ]
-
-      const {
-        getInputProps,
-        getListboxProps,
-        getOptionProps,
-        isHighlighted,
-        isExpanded,
-      } = useSelect({
-        data,
-        label: "Items",
-        getOptionValue: (item) => item,
-        onSelect: (value) => {
-          setSelected(value)
-        },
-      })
-
-      const handleStarClick =
-        (starType: string) => (event: React.MouseEvent) => {
-          event.stopPropagation()
-          setPreviewed(starType)
-        }
-
-      return (
-        <div>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search items"
-            {...getInputProps()}
-          />
-          <br />
-          Selected: {selected ?? "none"}
-          <br />
-          Previewed: {previewed ?? "none"}
-          {isExpanded && (
-            <div {...getListboxProps()}>
-              {data.map((starType) => (
-                <SelectItem
-                  key={starType}
-                  {...getOptionProps(starType)}
-                  highlighted={isHighlighted(starType)}
-                >
-                  {starType}{" "}
-                  <button onClick={handleStarClick(starType)}>preview</button>
-                </SelectItem>
-              ))}
-            </div>
-          )}
-        </div>
-      )
-    }}
-  />
+export const StaysOpenOnSelect = (
+  <Demo render={Template} props={{ minQueryLength: 0, closeOnSelect: false }} />
 )
+
+export const BlurableInput = (
+  <Demo render={BlurableDemoComponent} props={{ closeOnSelect: true }} />
+)
+
+export const BlurableInputAndMenuStaysOpen = (
+  <Demo render={BlurableDemoComponent} props={{ closeOnSelect: false }} />
+)
+
+function BlurableDemoComponent({ closeOnSelect }: { closeOnSelect: boolean }) {
+  const [query, setQuery] = useState("")
+  const [selected, setSelected] = useState("")
+  const [editing, setEditing] = useState(-1)
+
+  const [data, setData] = useState([
+    "Lithium-burning",
+    "Carbon-burning",
+    "Neon-burning",
+    "Oxygen-burning",
+  ])
+
+  const {
+    getInputProps,
+    getListboxProps,
+    getOptionProps,
+    isHighlighted,
+    isExpanded,
+  } = useSelect({
+    data,
+    label: "Items",
+    getOptionValue: (item) => item,
+    onSelect: (value, { close }) => {
+      setSelected(value)
+
+      if (closeOnSelect) close()
+    },
+  })
+
+  const toggleEditing = (index: number) => () => {
+    if (editing === index) {
+      setEditing(-1)
+    } else {
+      setEditing(index)
+    }
+  }
+
+  const updateStarType = (index: number) => (event: React.ChangeEvent) => {
+    const newData = [...data]
+    newData[index] = (event.target as HTMLInputElement).value
+    setData(newData)
+  }
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Search..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-label="Search items"
+        {...getInputProps()}
+      />
+      <br />
+      Selected: {selected ?? "none"}
+      {isExpanded && (
+        <div {...getListboxProps()}>
+          {data.map((starType, index) => (
+            <SelectItem
+              key={index}
+              {...getOptionProps(starType)}
+              highlighted={isHighlighted(starType)}
+            >
+              {editing === index ? (
+                <input
+                  type="text"
+                  value={starType}
+                  onChange={updateStarType(index)}
+                />
+              ) : (
+                starType
+              )}{" "}
+              <button onClick={toggleEditing(index)}>edit</button>
+            </SelectItem>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
