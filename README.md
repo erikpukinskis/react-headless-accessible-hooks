@@ -4,9 +4,6 @@ Hooks to power complex interactive components, leaving the DOM and styles to you
 
 ```
 npm add react-headless-accessible-hooks
-yarn add react-headless-accessible-hooks
-pnpm add react-headless-accessible-hooks
-bun add react-headless-accessible-hooks
 ```
 
 ## Design Principles
